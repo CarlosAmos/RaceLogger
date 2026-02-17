@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('worlds', function (Blueprint $table) {
+        Schema::create('countries', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->year('start_year');
-            $table->boolean('is_canonical')->default(false);
+            $table->string('name')->unique();
+            $table->string('iso_code', 3)->nullable();
+            $table->string('continent')->nullable();
             $table->timestamps();
         });
 
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('worlds');
+        Schema::dropIfExists('countries');
     }
 };

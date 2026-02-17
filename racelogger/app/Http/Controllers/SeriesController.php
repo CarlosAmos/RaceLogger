@@ -2,37 +2,49 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Series;
-use App\Models\World;
+use Illuminate\Http\Request;
 
 class SeriesController extends Controller
 {
     public function index()
     {
-        $series = Series::with('world')->paginate(10);
+        $worldId = session('active_world_id');
+
+        $series = Series::where('world_id', $worldId)
+            ->orderBy('created_at')
+            ->get();
+
         return view('series.index', compact('series'));
     }
 
     public function create()
     {
-        $worlds = World::all();
-        return view('series.create', compact('worlds'));
+        return view('series.create');
+    }
+
+    public function created(Series $series)
+    {
+        return view('series.created', compact('series'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'world_id' => 'required|exists:worlds,id',
             'name' => 'required|string|max:255',
-            'is_multiclass' => 'boolean',
         ]);
 
-        Series::create($validated);
+        $worldId = session('active_world_id');
 
-        return redirect()->route('series.index')
-            ->with('success', 'Series created.');
+        $series = Series::create([
+            'world_id' => $worldId,
+            'name' => $validated['name'],
+            'is_multiclass' => $request->has('is_multiclass'),
+        ]);
+
+        return redirect()->route('series.created', $series);
     }
+
 
     public function show(Series $series)
     {
@@ -41,19 +53,20 @@ class SeriesController extends Controller
 
     public function edit(Series $series)
     {
-        $worlds = World::all();
-        return view('series.edit', compact('series', 'worlds'));
+        return view('series.edit', compact('series'));
     }
 
     public function update(Request $request, Series $series)
     {
         $validated = $request->validate([
-            'world_id' => 'required|exists:worlds,id',
             'name' => 'required|string|max:255',
-            'is_multiclass' => 'boolean',
+            'is_multiclass' => 'nullable|boolean',
         ]);
 
-        $series->update($validated);
+        $series->update([
+            'name' => $validated['name'],
+            'is_multiclass' => $request->has('is_multiclass'),
+        ]);
 
         return redirect()->route('series.index')
             ->with('success', 'Series updated.');
@@ -67,4 +80,5 @@ class SeriesController extends Controller
             ->with('success', 'Series deleted.');
     }
 }
+
 

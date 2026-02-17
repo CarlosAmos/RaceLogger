@@ -13,15 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
-
-        $middleware->web(append: [
-            HandleAppearance::class,
-            HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'world.selected' => \App\Http\Middleware\EnsureWorldIsSelected::class,
         ]);
-    })
+    })->withProviders([
+        App\Providers\ViewServiceProvider::class,
+    ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

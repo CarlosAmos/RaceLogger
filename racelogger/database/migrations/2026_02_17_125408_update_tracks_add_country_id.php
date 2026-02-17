@@ -11,14 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('worlds', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->year('start_year');
-            $table->boolean('is_canonical')->default(false);
-            $table->timestamps();
-        });
+        Schema::table('tracks', function (Blueprint $table) {
 
+            $table->foreignId('country_id')
+                ->nullable()
+                ->after('city')
+                ->constrained()
+                ->nullOnDelete();
+
+        });
     }
 
     /**
@@ -26,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('worlds');
+        //
     }
 };

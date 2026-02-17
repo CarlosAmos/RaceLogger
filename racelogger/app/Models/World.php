@@ -11,6 +11,12 @@ class World extends Model
         'start_year',
     ];
 
+    protected $casts = [
+        'is_canonical' => 'boolean',
+        'current_year' => 'integer',
+    ];
+
+
     public function series()
     {
         return $this->hasMany(Series::class);

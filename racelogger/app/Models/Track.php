@@ -8,12 +8,18 @@ class Track extends Model
 {
     protected $fillable = [
         'name',
-        'country',
+        'country_id',
+        'city',
     ];
 
     public function layouts()
     {
         return $this->hasMany(TrackLayout::class);
+    }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
     }
 }
 
