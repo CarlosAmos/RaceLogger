@@ -10,12 +10,9 @@ class CalendarRace extends Model
         'season_id',
         'track_layout_id',
         'round_number',
-        'name',
+        'gp_name',
+        'race_code',
         'race_date',
-    ];
-
-    protected $casts = [
-        'race_date' => 'date',
     ];
 
     public function season()
@@ -23,14 +20,15 @@ class CalendarRace extends Model
         return $this->belongsTo(Season::class);
     }
 
-    public function trackLayout()
+    public function layout()
     {
-        return $this->belongsTo(TrackLayout::class);
+        return $this->belongsTo(TrackLayout::class, 'track_layout_id');
     }
 
-    public function raceSessions()
+    public function results()
     {
-        return $this->hasMany(RaceSession::class);
+        return $this->hasMany(Result::class);
     }
+
+    
 }
-

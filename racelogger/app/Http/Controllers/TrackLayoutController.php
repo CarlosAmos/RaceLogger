@@ -68,4 +68,17 @@ class TrackLayoutController extends Controller
         return redirect()->route('tracks.edit', $trackId)
             ->with('success', 'Layout deleted.');
     }
+
+    public function scopeActiveForYear($query, $year)
+    {
+        return $query
+            ->where(function ($q) use ($year) {
+                $q->whereNull('active_from')
+                ->orWhere('active_from', '<=', $year);
+            })
+            ->where(function ($q) use ($year) {
+                $q->whereNull('active_to')
+                ->orWhere('active_to', '>=', $year);
+            });
+    }
 }

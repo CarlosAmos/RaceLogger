@@ -33,6 +33,10 @@ return new class extends Migration
             $table->index('car_entry_id');
             $table->index('race_session_id');
             $table->index('position');
+
+            $table->foreignId('calendar_race_id')
+            ->constrained()
+            ->cascadeOnDelete();
         });
     }
 

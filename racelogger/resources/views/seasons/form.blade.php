@@ -2,6 +2,18 @@
 
 @section('content')
 
+
+@if ($errors->any())
+    <div style="background:#f8d7da; padding:10px; margin-bottom:15px;">
+        <ul style="margin:0;">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+
 <h1>{{ $mode === 'create' ? 'Create Season' : 'Edit Season' }}</h1>
 
 <form method="POST"
@@ -62,19 +74,24 @@
     </div>
 
     {{-- ===================== --}}
-    {{-- CLASSES TAB (If Multiclass) --}}
+    {{-- CLASSES TAB --}}
     {{-- ===================== --}}
-    @if($selectedSeries && $selectedSeries->is_multiclass)
-        <div id="classes" class="tab-section" style="display:none;">
+    <div id="classes" class="tab-section" style="display:none;">
 
-            <h3>Create Classes</h3>
+        <h3>Season Classes</h3>
 
-            <div id="class-container"></div>
-
-            <button type="button" onclick="addClass()">Add Class</button>
-
+        <div id="class-list" style="margin-bottom:15px;">
+            {{-- JS will render classes here --}}
         </div>
-    @endif
+
+        <div style="margin-top:10px;">
+            <button type="button" onclick="addClass()">+ Add Class</button>
+        </div>
+
+    </div>
+
+    {{-- Hidden inputs --}}
+    <div id="class-inputs"></div>
 
     {{-- ===================== --}}
     {{-- BASIC INFO TAB --}}
@@ -133,6 +150,23 @@
     }
 
     let selectedCircuits = [];
+
+    @if(isset($calendarRaces) && $calendarRaces->count())
+        selectedCircuits = [
+            @foreach($calendarRaces as $race)
+                {
+                    id: {{ $race->track_layout_id }},
+                    trackName: "{{ addslashes($race->layout->track->name) }}",
+                    layoutName: "{{ addslashes($race->layout->name) }}",
+                    city: "{{ addslashes($race->layout->track->city ?? '') }}",
+                    country: "{{ addslashes(optional($race->layout->track->country)->name ?? '') }}",
+                    gpName: "{{ addslashes($race->gp_name) }}",
+                    raceCode: "{{ $race->race_code }}",
+                    raceDate: "{{ $race->race_date }}"
+                }@if(!$loop->last),@endif
+            @endforeach
+        ];
+    @endif
 
     function addCircuit(id, trackName, layoutName, city, country) {
 
@@ -220,6 +254,16 @@
 
             list.appendChild(li);
 
+            updateHiddenInputs();
+        });
+    }
+
+    function updateHiddenInputs() {
+        const inputContainer = document.getElementById('circuit-inputs');
+        inputContainer.innerHTML = '';
+
+        selectedCircuits.forEach((circuit, index) => {
+
             inputContainer.innerHTML += `
                 <input type="hidden" name="circuits[${index}][layout_id]" value="${circuit.id}">
                 <input type="hidden" name="circuits[${index}][gp_name]" value="${circuit.gpName}">
@@ -230,8 +274,8 @@
     }
 
     function updateRaceDate(index, value) {
-    selectedCircuits[index].raceDate = value;
-    renderCircuits();
+        selectedCircuits[index].raceDate = value;
+        updateHiddenInputs();
     }
 
     function removeCircuit(index) {
@@ -242,12 +286,12 @@
 
     function updateGPName(index, value) {
         selectedCircuits[index].gpName = value;
-        renderCircuits();
+        updateHiddenInputs();
     }
 
     function updateRaceCode(index, value) {
         selectedCircuits[index].raceCode = value;
-        renderCircuits();
+        updateHiddenInputs();
     }
 
     let draggedIndex = null;
@@ -270,7 +314,106 @@
         renderCircuits();
     }
 
+    renderCircuits();
     showTab('circuits');
+
+    // =========================
+// CLASS LOGIC
+// =========================
+
+let seasonClasses = [];
+
+// 🔥 Load existing classes (edit mode)
+@if(isset($season) && $season->classes && $season->classes->count())
+    seasonClasses = [
+        @foreach($season->classes as $class)
+            {
+                name: "{{ addslashes($class->name) }}"
+            }@if(!$loop->last),@endif
+        @endforeach
+    ];
+@endif
+
+function addClass() {
+    seasonClasses.push({
+        name: ''
+    });
+
+    renderClasses();
+}
+
+function removeClass(index) {
+    seasonClasses.splice(index, 1);
+    renderClasses();
+}
+
+function updateClassName(index, value) {
+    seasonClasses[index].name = value;
+    updateClassHiddenInputs();
+}
+
+function renderClasses() {
+
+    const list = document.getElementById('class-list');
+    list.innerHTML = '';
+
+    if (seasonClasses.length === 0) {
+        list.innerHTML = `
+            <div style="color:#777; font-style:italic;">
+                No classes added. If left empty, a default "Overall" class will be created.
+            </div>
+        `;
+    }
+
+    seasonClasses.forEach((cls, index) => {
+
+        const row = document.createElement('div');
+
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "10px";
+        row.style.marginBottom = "8px";
+        row.style.padding = "6px";
+        row.style.border = "1px solid #ddd";
+        row.style.background = "#fafafa";
+
+        row.innerHTML = `
+            <strong style="width:40px;">${index + 1}</strong>
+
+            <input type="text"
+                   placeholder="Class Name (e.g. Hypercar)"
+                   value="${cls.name}"
+                   style="flex:1;"
+                   oninput="updateClassName(${index}, this.value)">
+
+            <button type="button"
+                    style="background:#d9534f; color:white; border:none; padding:4px 8px;"
+                    onclick="removeClass(${index})">
+                ✕
+            </button>
+        `;
+
+        list.appendChild(row);
+    });
+
+    updateClassHiddenInputs();
+}
+
+function updateClassHiddenInputs() {
+
+    const container = document.getElementById('class-inputs');
+    container.innerHTML = '';
+
+    seasonClasses.forEach((cls, index) => {
+
+        container.innerHTML += `
+            <input type="hidden" name="classes[${index}]" value="${cls.name}">
+        `;
+    });
+}
+
+// Initial render
+renderClasses();
 
 </script>
 

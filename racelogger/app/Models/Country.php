@@ -16,5 +16,10 @@ class Country extends Model
     {
         return $this->hasMany(Track::class);
     }
+
+    public function constructors()
+    {
+        return $this->hasMany(Constructor::class);
+    }
 }
 

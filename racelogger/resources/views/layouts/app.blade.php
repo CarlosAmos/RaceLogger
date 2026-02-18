@@ -56,7 +56,7 @@
             <a href="{{ route('series.index') }}">Series</a>
             <a href="{{ route('seasons.index') }}">Seasons</a>
             <a href="{{ route('tracks.index') }}">Tracks</a>
-            <a href="{{ route('teams.index') }}">Teams</a>
+            <a href="{{ route('worlds.constructors.index', $world) }}">Teams</a>
             <a href="{{ route('drivers.index') }}">Drivers</a>
             <a href="{{ route('world.select') }}">Change World</a>
         </div>

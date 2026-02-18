@@ -15,6 +15,7 @@ use App\Http\Controllers\CalendarRaceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TrackController;
 use App\Http\Controllers\TrackLayoutController;
+use App\Http\Controllers\ConstructorController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -57,5 +58,5 @@ Route::get('/series/{series}/created', [SeriesController::class, 'created'])
 
 Route::resource('tracks', TrackController::class);
 Route::resource('track-layouts', TrackLayoutController::class);
-
-
+//Route::resource('constructors', ConstructorController::class)->scoped();
+Route::resource('worlds.constructors', ConstructorController::class);

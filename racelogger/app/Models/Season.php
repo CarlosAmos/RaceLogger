@@ -23,7 +23,8 @@ class Season extends Model
 
     public function calendarRaces()
     {
-        return $this->hasMany(CalendarRace::class);
+        return $this->hasMany(CalendarRace::class)
+                    ->orderBy('round_number');
     }
 
     public function seasonTeamEntries()
@@ -35,5 +36,12 @@ class Season extends Model
     {
         return $this->hasOne(PointsSystem::class);
     }
+
+    public function classes()
+    {
+        return $this->hasMany(SeasonClass::class)
+                    ->orderBy('display_order');
+    }
+
 }
 

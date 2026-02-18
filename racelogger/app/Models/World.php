@@ -36,5 +36,9 @@ class World extends Model
     {
         return $this->hasMany(LapRecord::class);
     }
-}
 
+    public function constructors()
+    {
+        return $this->hasMany(Constructor::class);
+    }
+}

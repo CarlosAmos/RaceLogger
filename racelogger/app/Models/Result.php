@@ -7,14 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class Result extends Model
 {
     protected $fillable = [
-        'race_session_id',
-        'car_entry_id',
+        'calendar_race_id',
+        'car_id',
+        'driver_id',
         'position',
-        'grid_position',
+        'class_position',
+        'time',
         'laps_completed',
         'status',
-        'lap_time_ms',
-        'points_awarded',
+        'points',
     ];
 
     protected $casts = [
@@ -29,6 +30,11 @@ class Result extends Model
     public function carEntry()
     {
         return $this->belongsTo(CarEntry::class);
+    }
+
+    public function calendarRace()
+    {
+        return $this->belongsTo(CalendarRace::class);
     }
 }
 

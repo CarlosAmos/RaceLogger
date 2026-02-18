@@ -11,28 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('calendar_races', function (Blueprint $table) {
+        Schema::create('season_classes', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('season_id')
                 ->constrained()
                 ->cascadeOnDelete();
 
-            $table->foreignId('track_layout_id')
-                ->constrained()
-                ->cascadeOnDelete();
-
-            $table->integer('round_number');
-
-            $table->string('gp_name');
-            $table->string('race_code', 3);
-            $table->date('race_date');
+            $table->string('name');
+            $table->integer('display_order')->default(0);
 
             $table->timestamps();
 
-            $table->unique(['season_id', 'round_number']);
-            $table->unique(['season_id', 'race_code']);
+            $table->unique(['season_id', 'name']);
         });
+
     }
 
     /**
@@ -40,6 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('calendar_races');
+        Schema::dropIfExists('season_classes');
     }
 };
