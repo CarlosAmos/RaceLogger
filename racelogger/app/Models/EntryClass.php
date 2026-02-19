@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class EntryClass extends Model
 {
+    protected $fillable = [
+        'race_class_id',
+    ];
     //
     public function entry()
     {
@@ -14,11 +17,23 @@ class EntryClass extends Model
 
     public function raceClass()
     {
-        return $this->belongsTo(RaceClass::class);
+        return $this->belongsTo(SeasonClass::class, 'race_class_id');
     }
 
     public function cars()
     {
         return $this->hasMany(Car::class);
     }
+
+    public function seasonEntry()
+    {
+        return $this->belongsTo(SeasonEntry::class);
+    }
+
+    public function entryCars()
+    {
+        return $this->hasMany(EntryCar::class);
+    }
+
+
 }

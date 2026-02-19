@@ -38,7 +38,7 @@
                 <button>Open Season</button>
             </a>
 
-            <a href="{{ route('seasons.edit', $season->id) }}">
+            <a href="{{ route('seasons.edit', $season->id, $world) }}">
                 <button>Edit</button>
             </a>
         </div>

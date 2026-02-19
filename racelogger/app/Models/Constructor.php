@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Constructor extends Model
 {
-        protected $fillable = [
-            'world_id',
-            'name',
-            'country_id'
-        ];
+    protected $fillable = [
+        'world_id',
+        'name',
+        'country_id'
+    ];
     //
     public function entries()
     {
@@ -22,4 +22,14 @@ class Constructor extends Model
         return $this->belongsTo(Country::class);
     }
 
+    public function carModels()
+    {
+        return $this->hasMany(CarModel::class);
+    }
+
+    public function entrants()
+    {
+        return $this->hasMany(Entrant::class);
+    }
+    
 }

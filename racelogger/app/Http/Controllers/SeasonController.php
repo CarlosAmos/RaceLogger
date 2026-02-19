@@ -50,7 +50,8 @@ class SeasonController extends Controller
             'seriesId' => $seriesId,
             'defaultYear' => $defaultYear,
             'layouts' => $layouts,
-            'mode' => 'create'
+            'mode' => 'create',
+            'worlds' => $world
         ]);
     }
 
@@ -151,12 +152,23 @@ class SeasonController extends Controller
 
     public function show(Season $season)
     {
-        return view('seasons.show', compact('season'));
+        $worldId = session('active_world_id');
+        $world = World::findOrFail($worldId);
+
+        $season->load([
+            'seasonEntries.entrant',
+            'seasonEntries.constructor'
+        ]);
+
+
+        return view('seasons.show', compact('world', 'season'));
     }
 
-    public function edit(Season $season)
+    public function edit(Season $season, World $world)
     {
+        
         $worldId = session('active_world_id');
+        $world = World::findOrFail($worldId);
 
         abort_unless($season->series->world_id == $worldId, 403);
 
@@ -181,7 +193,8 @@ class SeasonController extends Controller
             'defaultYear' => $season->year,
             'layouts' => $layouts,
             'calendarRaces' => $calendarRaces,
-            'mode' => 'edit'
+            'mode' => 'edit',
+            'worlds' => $world
         ]);
     }
 
@@ -246,31 +259,52 @@ class SeasonController extends Controller
             ]);
 
             // =========================
-            // DELETE OLD CLASSES
+            // SYNC SEASON CLASSES
             // =========================
-            $season->classes()->delete();
 
-            // =========================
-            // SAVE CLASSES
-            // =========================
+            $existingClassIds = [];
+
             if ($request->has('classes') && !empty($request->classes)) {
 
                 foreach ($request->classes as $index => $className) {
 
-                    SeasonClass::create([
-                        'season_id' => $season->id,
-                        'name' => $className,
-                        'display_order' => $index + 1,
-                    ]);
+                    // Try find existing class by name for this season
+                    $seasonClass = $season->classes()
+                        ->where('name', $className)
+                        ->first();
+
+                    if ($seasonClass) {
+                        // Update display order only
+                        $seasonClass->update([
+                            'display_order' => $index + 1,
+                        ]);
+                    } else {
+                        // Create new class
+                        $seasonClass = $season->classes()->create([
+                            'name' => $className,
+                            'display_order' => $index + 1,
+                        ]);
+                    }
+
+                    $existingClassIds[] = $seasonClass->id;
                 }
 
             } else {
-                SeasonClass::create([
-                    'season_id' => $season->id,
-                    'name' => 'Overall',
-                    'display_order' => 1,
-                ]);
+
+                $seasonClass = $season->classes()->firstOrCreate(
+                    ['name' => 'Overall'],
+                    ['display_order' => 1]
+                );
+
+                $existingClassIds[] = $seasonClass->id;
             }
+
+            // Delete classes that were removed (only if not in use)
+            $season->classes()
+                ->whereNotIn('id', $existingClassIds)
+                ->whereDoesntHave('entryClasses')
+                ->delete();
+
 
             // =========================
             // DELETE OLD CALENDAR
@@ -293,9 +327,8 @@ class SeasonController extends Controller
             }
 
             DB::commit();
-
             return redirect()
-                ->route('dashboard')
+                ->route('seasons.show', [$season])
                 ->with('success', 'Season updated successfully.');
 
         } catch (\Throwable $e) {

@@ -16,6 +16,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TrackController;
 use App\Http\Controllers\TrackLayoutController;
 use App\Http\Controllers\ConstructorController;
+use App\Http\Controllers\EntrantController;
+use App\Http\Controllers\SeasonEntryController;
+use App\Http\Controllers\EntryClassController;
+use App\Http\Controllers\ConstructorCarModelController;
+use App\Http\Controllers\WorldEngineController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -60,3 +65,29 @@ Route::resource('tracks', TrackController::class);
 Route::resource('track-layouts', TrackLayoutController::class);
 //Route::resource('constructors', ConstructorController::class)->scoped();
 Route::resource('worlds.constructors', ConstructorController::class);
+Route::resource('worlds.entrants', EntrantController::class);
+Route::resource('worlds.seasons', SeasonController::class);
+
+Route::resource(
+    'worlds.seasons.season-entries',
+    SeasonEntryController::class
+);
+
+Route::post(
+    'worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes',
+    [EntryClassController::class, 'store']
+)->name('worlds.seasons.season-entries.entry-classes.store');
+
+Route::delete(
+    'worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes/{entryClass}',
+    [EntryClassController::class, 'destroy']
+)->name('worlds.seasons.season-entries.entry-classes.destroy');
+
+Route::resource(
+    'worlds.constructors.car-models',
+    ConstructorCarModelController::class
+);
+
+
+Route::resource('worlds.engines', WorldEngineController::class);
+

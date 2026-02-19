@@ -2,32 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\World;
 use App\Models\Country;
-use Illuminate\Http\Request;
 
-class ConstructorController extends Controller
+class EntrantController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(World $world)
+    public function index()
     {
-        $constructors = $world->constructors()
-        ->with('country')
-        ->orderBy('name')
-        ->get();
-
-            $entrants = $world->entrants()
-                ->with(['country'])
-                ->orderBy('name')
-                ->get();
-
-            return view('constructors.index', compact(
-                'world',
-                'constructors',
-                'entrants'
-            ));
+        //
     }
 
     /**
@@ -37,8 +23,10 @@ class ConstructorController extends Controller
     {
         $countries = Country::orderBy('name')->get();
 
-        return view('constructors.create', compact('world', 'countries'));
-
+        return view('entrants.create', compact(
+            'world',
+            'countries'
+        ));
     }
 
     /**
@@ -49,16 +37,14 @@ class ConstructorController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'country_id' => 'nullable|exists:countries,id',
-            'color' => 'nullable|string|max:7',
         ]);
 
-        $world->constructors()->create($validated);
+        $world->entrants()->create($validated);
 
         return redirect()
             ->route('worlds.constructors.index', $world)
-            ->with('success', 'Team created successfully.');
+            ->with('success', 'Entrant created successfully.');
     }
-
     /**
      * Display the specified resource.
      */

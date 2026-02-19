@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>{{ config('app.name', 'Virtual Racing Logger') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
         body {
@@ -56,7 +57,13 @@
             <a href="{{ route('series.index') }}">Series</a>
             <a href="{{ route('seasons.index') }}">Seasons</a>
             <a href="{{ route('tracks.index') }}">Tracks</a>
+            @php
+            if(!isset($world)) $world = $activeWorld;
+            @endphp
+
+
             <a href="{{ route('worlds.constructors.index', $world) }}">Teams</a>
+            
             <a href="{{ route('drivers.index') }}">Drivers</a>
             <a href="{{ route('world.select') }}">Change World</a>
         </div>

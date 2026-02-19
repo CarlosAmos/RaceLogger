@@ -41,4 +41,14 @@ class World extends Model
     {
         return $this->hasMany(Constructor::class);
     }
+
+    public function entrants()
+    {
+        return $this->hasMany(Entrant::class);
+    }
+
+    public function engines()
+    {
+        return $this->hasMany(Engine::class);
+    }
 }

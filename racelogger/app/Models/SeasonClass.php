@@ -16,5 +16,15 @@ class SeasonClass extends Model
     {
         return $this->belongsTo(Season::class);
     }
+
+    public function seasonClasses()
+    {
+        return $this->hasMany(SeasonClass::class);
+    }
+
+    public function entryClasses()
+    {
+        return $this->hasMany(EntryClass::class, 'race_class_id');
+    }
 }
 

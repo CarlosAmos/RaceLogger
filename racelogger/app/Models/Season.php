@@ -43,5 +43,14 @@ class Season extends Model
                     ->orderBy('display_order');
     }
 
+    public function seasonEntries()
+    {
+        return $this->hasMany(SeasonEntry::class);
+    }
+
+    public function seasonClasses()
+    {
+        return $this->hasMany(SeasonClass::class);
+    }
 }
 

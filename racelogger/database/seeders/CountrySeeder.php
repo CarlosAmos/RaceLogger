@@ -27,7 +27,7 @@ class CountrySeeder extends Seeder
             ['name' => 'Switzerland', 'iso_code' => 'CHE', 'continent' => 'Europe'],
             ['name' => 'Denmark', 'iso_code' => 'DNK', 'continent' => 'Europe'],
             ['name' => 'Sweden', 'iso_code' => 'SWE', 'continent' => 'Europe'],
-
+            ['name' => 'Poland', 'iso_code' => 'POL', 'continent' => 'Europe'],
             // 🇺🇸 North America
             ['name' => 'United States', 'iso_code' => 'USA', 'continent' => 'North America'],
             ['name' => 'Canada', 'iso_code' => 'CAN', 'continent' => 'North America'],
@@ -47,6 +47,7 @@ class CountrySeeder extends Seeder
             ['name' => 'United Arab Emirates', 'iso_code' => 'ARE', 'continent' => 'Asia'],
             ['name' => 'Malaysia', 'iso_code' => 'MYS', 'continent' => 'Asia'],
             ['name' => 'South Korea', 'iso_code' => 'KOR', 'continent' => 'Asia'],
+            ['name' => 'Oman', 'iso_code' => 'OMA', 'continent' => 'Asia'],
 
             // 🇦🇺 Oceania
             ['name' => 'Australia', 'iso_code' => 'AUS', 'continent' => 'Oceania'],

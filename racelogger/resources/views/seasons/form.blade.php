@@ -15,9 +15,8 @@
 
 
 <h1>{{ $mode === 'create' ? 'Create Season' : 'Edit Season' }}</h1>
-
 <form method="POST"
-      action="{{ $mode === 'create' ? route('seasons.store') : route('seasons.update', $season) }}">
+      action="{{ $mode === 'create' ? route('seasons.store') : route('seasons.update', $season, $worlds) }}">
 
     @csrf
     @if($mode === 'edit')

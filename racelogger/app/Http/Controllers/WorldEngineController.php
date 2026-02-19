@@ -2,32 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\World;
-use App\Models\Country;
 use Illuminate\Http\Request;
+use App\Models\World;
 
-class ConstructorController extends Controller
+class WorldEngineController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
     public function index(World $world)
     {
-        $constructors = $world->constructors()
-        ->with('country')
-        ->orderBy('name')
-        ->get();
+        $engines = $world->engines()
+            ->orderBy('name')
+            ->get();
 
-            $entrants = $world->entrants()
-                ->with(['country'])
-                ->orderBy('name')
-                ->get();
-
-            return view('constructors.index', compact(
-                'world',
-                'constructors',
-                'entrants'
-            ));
+        return view('engines.index', compact('world', 'engines'));
     }
 
     /**
@@ -35,10 +24,7 @@ class ConstructorController extends Controller
      */
     public function create(World $world)
     {
-        $countries = Country::orderBy('name')->get();
-
-        return view('constructors.create', compact('world', 'countries'));
-
+        return view('engines.create', compact('world'));
     }
 
     /**
@@ -48,15 +34,18 @@ class ConstructorController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'country_id' => 'nullable|exists:countries,id',
-            'color' => 'nullable|string|max:7',
+            'configuration' => 'nullable|string|max:50',
+            'capacity' => 'nullable|string|max:50',
         ]);
 
-        $world->constructors()->create($validated);
+        $world->engines()->create([
+            ...$validated,
+            'hybrid' => $request->has('hybrid'),
+        ]);
 
         return redirect()
-            ->route('worlds.constructors.index', $world)
-            ->with('success', 'Team created successfully.');
+            ->route('worlds.engines.index', $world)
+            ->with('success', 'Engine created successfully.');
     }
 
     /**
