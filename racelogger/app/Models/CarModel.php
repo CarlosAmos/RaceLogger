@@ -23,4 +23,9 @@ class CarModel extends Model
     {
         return $this->belongsTo(Engine::class);
     }
+
+    public function entryCars()
+    {
+        return $this->hasMany(EntryCar::class);
+    }
 }

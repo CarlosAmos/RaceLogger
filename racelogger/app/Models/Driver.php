@@ -10,13 +10,8 @@ class Driver extends Model
         'world_id',
         'first_name',
         'last_name',
-        'nationality',
+        'country_id',
         'date_of_birth',
-        'rating',
-    ];
-
-    protected $casts = [
-        'date_of_birth' => 'date',
     ];
 
     public function world()
@@ -24,6 +19,11 @@ class Driver extends Model
         return $this->belongsTo(World::class);
     }
 
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
+    }
+    
     public function lapRecords()
     {
         return $this->hasMany(LapRecord::class);
@@ -31,7 +31,14 @@ class Driver extends Model
 
     public function getFullNameAttribute()
     {
-        return "{$this->first_name} {$this->last_name}";
+        return $this->first_name . ' ' . $this->last_name;
+    }
+
+    public function entryCars()
+    {
+        return $this->belongsToMany(
+            EntryCar::class,
+            'entry_car_driver' // <-- explicitly define table
+        )->withTimestamps();
     }
 }
-

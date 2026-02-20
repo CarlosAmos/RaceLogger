@@ -8,18 +8,12 @@ class EntryCar extends Model
 {
     //
     protected $fillable = [
-        'season_entry_id',
         'entry_class_id',
         'car_model_id',
         'car_number',
         'livery_name',
         'chassis_code',
     ];
-
-    public function seasonEntry()
-    {
-        return $this->belongsTo(SeasonEntry::class);
-    }
 
     public function entryClass()
     {
@@ -33,6 +27,9 @@ class EntryCar extends Model
 
     public function drivers()
     {
-        return $this->hasMany(Driver::class);
+        return $this->belongsToMany(
+            Driver::class,
+            'entry_car_driver' // <-- explicitly define table
+        )->withTimestamps();
     }
 }

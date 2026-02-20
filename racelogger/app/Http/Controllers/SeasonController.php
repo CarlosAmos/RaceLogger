@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Constructor;
 use App\Models\Series;
 use App\Models\Season;
 use App\Models\World;
@@ -155,16 +156,44 @@ class SeasonController extends Controller
         $worldId = session('active_world_id');
         $world = World::findOrFail($worldId);
 
+        $tab = request('tab', 'calender');
+
+        // $season->load([
+        //     'seasonClasses',
+        //     'seasonEntries.entrant',
+        //     'seasonEntries.entryClasses.raceClass',
+        //     'seasonEntries.entryClasses.entryCars.carModel.engine',
+        //     'seasonEntries.entryClasses.entryCars.carModel.constructor',
+        //     'seasonEntries.entryClasses.entryCars.drivers.country',
+
+        // ]);
+
         $season->load([
+            'seasonClasses',
             'seasonEntries.entrant',
-            'seasonEntries.constructor'
-        ]);
+            'seasonEntries.entryClasses.raceClass',
+
+            'seasonEntries.entryClasses.entryCars.carModel.engine',
+            'seasonEntries.entryClasses.entryCars.carModel.constructor',
+
+            // Drivers
+            'seasonEntries.entryClasses.entryCars.drivers.country',
+
+            // Team (if entryCars belongsTo team)
+
+            // 🔥 Calendar
+            'calendarRaces.results',
+            ]);
 
 
-        return view('seasons.show', compact('world', 'season'));
+        return view('seasons.show', compact(
+            'world',
+            'season',
+            'tab'
+        ));
     }
 
-    public function edit(Season $season, World $world)
+    public function edit(World $world, Season $season)
     {
         
         $worldId = session('active_world_id');

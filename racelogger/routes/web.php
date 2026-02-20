@@ -21,6 +21,10 @@ use App\Http\Controllers\SeasonEntryController;
 use App\Http\Controllers\EntryClassController;
 use App\Http\Controllers\ConstructorCarModelController;
 use App\Http\Controllers\WorldEngineController;
+use App\Http\Controllers\EntryCarController;
+use App\Http\Controllers\WorldDriverController;
+use App\Http\Controllers\EntryCarDriverController;
+
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -88,6 +92,27 @@ Route::resource(
     ConstructorCarModelController::class
 );
 
-
 Route::resource('worlds.engines', WorldEngineController::class);
 
+
+Route::resource(
+    'worlds.seasons.season-entries.entry-classes',
+    EntryClassController::class
+);
+
+Route::resource(
+    'worlds.seasons.season-entries.entry-classes.entry-cars',
+    EntryCarController::class
+);
+
+Route::resource('worlds.drivers', WorldDriverController::class);
+
+Route::prefix('worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes/{entryClass}/entry-cars/{entryCar}')
+    ->group(function () {
+
+        Route::get('drivers', [EntryCarDriverController::class, 'edit'])
+            ->name('entry-cars.drivers.edit');
+
+        Route::post('drivers', [EntryCarDriverController::class, 'update'])
+            ->name('entry-cars.drivers.update');
+    });
