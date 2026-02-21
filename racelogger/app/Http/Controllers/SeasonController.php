@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Constructor;
 use App\Models\Series;
 use App\Models\Season;
 use App\Models\World;
 use App\Models\TrackLayout;
 use App\Models\CalendarRace;
 use App\Models\SeasonClass;
+use App\Models\PointSystem;
 use Illuminate\Support\Facades\DB;
 
 class SeasonController extends Controller
@@ -26,24 +26,23 @@ class SeasonController extends Controller
         $world = World::findOrFail($worldId);
 
         $seriesId = $request->query('series_id');
-
         $series = Series::where('world_id', $worldId)->get();
 
         $defaultYear = $world->current_year;
-
-        $seasonYear = $defaultYear; // for create
-        // OR $season->year for edit
+        $seasonYear = $defaultYear;
 
         $layouts = TrackLayout::with('track')
             ->where(function ($query) use ($seasonYear) {
                 $query->whereNull('active_from')
-                    ->orWhere('active_from', '<=', $seasonYear);
+                      ->orWhere('active_from', '<=', $seasonYear);
             })
             ->where(function ($query) use ($seasonYear) {
                 $query->whereNull('active_to')
-                    ->orWhere('active_to', '>=', $seasonYear);
+                      ->orWhere('active_to', '>=', $seasonYear);
             })
             ->get();
+
+        $pointSystems = PointSystem::with(['rules','bonusRules'])->get();
 
         return view('seasons.form', [
             'season' => new Season(),
@@ -52,33 +51,30 @@ class SeasonController extends Controller
             'defaultYear' => $defaultYear,
             'layouts' => $layouts,
             'mode' => 'create',
-            'worlds' => $world
+            'worlds' => $world,
+            'pointSystems' => $pointSystems
         ]);
     }
 
-
     public function store(Request $request)
     {
-        // =========================
-        // VALIDATION
-        // =========================
         $validated = $request->validate([
             'series_id' => 'required|exists:series,id',
             'year' => 'required|integer|min:1900|max:2100',
+
+            'point_system_id' => 'nullable|exists:point_systems,id',
 
             'circuits' => 'required|array|min:1',
             'circuits.*.layout_id' => 'required|exists:track_layouts,id',
             'circuits.*.gp_name' => 'required|string|max:255',
             'circuits.*.race_code' => ['required','string','size:3','alpha'],
             'circuits.*.race_date' => 'required|date',
+            'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
         ]);
 
-        // =========================
-        // DUPLICATE RACE CODE CHECK
-        // =========================
         $raceCodes = collect($request->circuits)
             ->pluck('race_code')
             ->map(fn($code) => strtoupper($code));
@@ -93,28 +89,23 @@ class SeasonController extends Controller
 
             DB::beginTransaction();
 
-            // Create Season
+            // Create Season (WITH default point system)
             $season = Season::create([
                 'series_id' => $request->series_id,
                 'year' => $request->year,
+                'point_system_id' => $request->point_system_id ?: null,
             ]);
 
-            // =========================
-            // SAVE CLASSES
-            // =========================
+            // Save Classes
             if ($request->has('classes') && !empty($request->classes)) {
-
                 foreach ($request->classes as $index => $className) {
-
                     SeasonClass::create([
                         'season_id' => $season->id,
                         'name' => $className,
                         'display_order' => $index + 1,
                     ]);
                 }
-
             } else {
-                // Auto-create default class for single-class series
                 SeasonClass::create([
                     'season_id' => $season->id,
                     'name' => 'Overall',
@@ -122,9 +113,7 @@ class SeasonController extends Controller
                 ]);
             }
 
-            // =========================
-            // SAVE CALENDAR
-            // =========================
+            // Save Calendar (WITH race override point system)
             foreach ($request->circuits as $index => $race) {
 
                 CalendarRace::create([
@@ -134,6 +123,7 @@ class SeasonController extends Controller
                     'gp_name' => $race['gp_name'],
                     'race_code' => strtoupper($race['race_code']),
                     'race_date' => $race['race_date'],
+                    'point_system_id' => $race['point_system_id'] ?? null,
                 ]);
             }
 
@@ -146,7 +136,6 @@ class SeasonController extends Controller
         } catch (\Throwable $e) {
 
             DB::rollBack();
-
             dd($e->getMessage(), $e->getTraceAsString());
         }
     }
@@ -158,33 +147,15 @@ class SeasonController extends Controller
 
         $tab = request('tab', 'calender');
 
-        // $season->load([
-        //     'seasonClasses',
-        //     'seasonEntries.entrant',
-        //     'seasonEntries.entryClasses.raceClass',
-        //     'seasonEntries.entryClasses.entryCars.carModel.engine',
-        //     'seasonEntries.entryClasses.entryCars.carModel.constructor',
-        //     'seasonEntries.entryClasses.entryCars.drivers.country',
-
-        // ]);
-
         $season->load([
             'seasonClasses',
             'seasonEntries.entrant',
             'seasonEntries.entryClasses.raceClass',
-
             'seasonEntries.entryClasses.entryCars.carModel.engine',
             'seasonEntries.entryClasses.entryCars.carModel.constructor',
-
-            // Drivers
             'seasonEntries.entryClasses.entryCars.drivers.country',
-
-            // Team (if entryCars belongsTo team)
-
-            // 🔥 Calendar
             'calendarRaces.results',
-            ]);
-
+        ]);
 
         return view('seasons.show', compact(
             'world',
@@ -195,7 +166,6 @@ class SeasonController extends Controller
 
     public function edit(World $world, Season $season)
     {
-        
         $worldId = session('active_world_id');
         $world = World::findOrFail($worldId);
 
@@ -205,7 +175,6 @@ class SeasonController extends Controller
 
         $seasonYear = $season->year;
 
-        // 🔥 Only active layouts for this season year
         $layouts = TrackLayout::with(['track.country'])
             ->activeForYear($seasonYear)
             ->get();
@@ -215,6 +184,8 @@ class SeasonController extends Controller
             ->orderBy('round_number')
             ->get();
 
+        $pointSystems = PointSystem::with(['rules','bonusRules'])->get();
+
         return view('seasons.form', [
             'season' => $season,
             'series' => $series,
@@ -223,33 +194,30 @@ class SeasonController extends Controller
             'layouts' => $layouts,
             'calendarRaces' => $calendarRaces,
             'mode' => 'edit',
-            'worlds' => $world
+            'worlds' => $world,
+            'pointSystems' => $pointSystems
         ]);
     }
 
-
     public function update(Request $request, Season $season)
     {
-        // =========================
-        // VALIDATION
-        // =========================
         $validated = $request->validate([
             'series_id' => 'required|exists:series,id',
             'year' => 'required|integer|min:1900|max:2100',
+
+            'point_system_id' => 'nullable|exists:point_systems,id',
 
             'circuits' => 'required|array|min:1',
             'circuits.*.layout_id' => 'required|exists:track_layouts,id',
             'circuits.*.gp_name' => 'required|string|max:255',
             'circuits.*.race_code' => ['required','string','size:3','alpha'],
             'circuits.*.race_date' => 'required|date',
+            'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
         ]);
 
-        // =========================
-        // DUPLICATE RACE CODE CHECK
-        // =========================
         $raceCodes = collect($request->circuits)
             ->pluck('race_code')
             ->map(fn($code) => strtoupper($code));
@@ -264,51 +232,39 @@ class SeasonController extends Controller
 
             DB::beginTransaction();
 
-            // =========================
-            // LOCK CHECK
-            // =========================
             $hasResults = $season->calendarRaces()
                 ->whereHas('results')
                 ->exists();
 
             if ($hasResults) {
                 DB::rollBack();
-
                 return back()
                     ->withErrors(['season' => 'Calendar cannot be modified because results already exist.'])
                     ->withInput();
             }
 
-            // =========================
-            // UPDATE SEASON
-            // =========================
+            // Update season (WITH default point system)
             $season->update([
                 'series_id' => $request->series_id,
                 'year' => $request->year,
+                'point_system_id' => $request->point_system_id ?: null,
             ]);
 
-            // =========================
-            // SYNC SEASON CLASSES
-            // =========================
-
+            // Sync classes
             $existingClassIds = [];
 
             if ($request->has('classes') && !empty($request->classes)) {
-
                 foreach ($request->classes as $index => $className) {
 
-                    // Try find existing class by name for this season
                     $seasonClass = $season->classes()
                         ->where('name', $className)
                         ->first();
 
                     if ($seasonClass) {
-                        // Update display order only
                         $seasonClass->update([
                             'display_order' => $index + 1,
                         ]);
                     } else {
-                        // Create new class
                         $seasonClass = $season->classes()->create([
                             'name' => $className,
                             'display_order' => $index + 1,
@@ -317,7 +273,6 @@ class SeasonController extends Controller
 
                     $existingClassIds[] = $seasonClass->id;
                 }
-
             } else {
 
                 $seasonClass = $season->classes()->firstOrCreate(
@@ -328,21 +283,15 @@ class SeasonController extends Controller
                 $existingClassIds[] = $seasonClass->id;
             }
 
-            // Delete classes that were removed (only if not in use)
             $season->classes()
                 ->whereNotIn('id', $existingClassIds)
                 ->whereDoesntHave('entryClasses')
                 ->delete();
 
-
-            // =========================
-            // DELETE OLD CALENDAR
-            // =========================
+            // Delete old calendar
             $season->calendarRaces()->delete();
 
-            // =========================
-            // RECREATE CALENDAR
-            // =========================
+            // Recreate calendar (WITH race override point system)
             foreach ($request->circuits as $index => $race) {
 
                 CalendarRace::create([
@@ -352,10 +301,12 @@ class SeasonController extends Controller
                     'gp_name' => $race['gp_name'],
                     'race_code' => strtoupper($race['race_code']),
                     'race_date' => $race['race_date'],
+                    'point_system_id' => $race['point_system_id'] ?? null,
                 ]);
             }
 
             DB::commit();
+
             return redirect()
                 ->route('seasons.show', [$season])
                 ->with('success', 'Season updated successfully.');
@@ -363,7 +314,6 @@ class SeasonController extends Controller
         } catch (\Throwable $e) {
 
             DB::rollBack();
-
             dd($e->getMessage(), $e->getTraceAsString());
         }
     }

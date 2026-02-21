@@ -18,11 +18,12 @@
             Edit Season
         </a>
     </div>
+
     {{-- Tabs --}}
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item">
-            <a class="nav-link {{ $tab === 'results' ? 'active' : '' }}"
-                href="{{ route('seasons.show', [$season, 'tab' => 'results']) }}">
+            <a class="nav-link {{ $tab === 'calender' ? 'active' : '' }}"
+                href="{{ route('seasons.show', [$season, 'tab' => 'calender']) }}">
                 Results
             </a>
         </li>
@@ -40,7 +41,7 @@
         </li>
     </ul>
 
-    @if($tab === 'results')
+    @if($tab === 'calender')
     @php
     $races = $season->calendarRaces;
     $rows = collect();
@@ -59,6 +60,7 @@
         }
     }
     @endphp
+
     <div class="table-responsive">
         <table class="table table-bordered table-sm text-center align-middle">
 
@@ -69,7 +71,20 @@
                     <th class="text-start">Team</th>
 
                     @foreach($races as $race)
-                    <th>{{ $race->race_code }}</th>
+                    <th class="text-center">
+                        <a href="{{ route('races.show', $race) }}"
+                        class="text-decoration-none fw-bold">
+
+                            {{ $race->race_code }}
+
+                            @if($race->is_locked)
+                                <span class="badge bg-success ms-1">
+                                    Locked
+                                </span>
+                            @endif
+
+                        </a>
+                    </th>
                     @endforeach
 
                     <th>Points</th>

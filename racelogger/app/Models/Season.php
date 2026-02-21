@@ -9,7 +9,8 @@ class Season extends Model
     protected $fillable = [
         'series_id',
         'year',
-        'is_simulated',
+        'point_system_id',
+        'is_simulated' => 'boolean',
     ];
 
     protected $casts = [
@@ -51,6 +52,11 @@ class Season extends Model
     public function seasonClasses()
     {
         return $this->hasMany(SeasonClass::class);
+    }
+
+    public function pointSystem()
+    {
+        return $this->belongsTo(PointSystem::class);
     }
 }
 

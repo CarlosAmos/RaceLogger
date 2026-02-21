@@ -2,57 +2,93 @@
 
 @section('content')
 
+<style>
+.page-card {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+}
 
-@if ($errors->any())
-    <div style="background:#f8d7da; padding:10px; margin-bottom:15px;">
-        <ul style="margin:0;">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+.tab-nav {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
 
+.tab-nav button {
+    padding: 8px 14px;
+    border: none;
+    background: #e9ecef;
+    cursor: pointer;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.tab-nav button.active {
+    background: #007bff;
+    color: white;
+}
+
+.tab-section {
+    background: #fafafa;
+    padding: 20px;
+    border-radius: 6px;
+}
+
+.circuit-card {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+    background: white;
+}
+
+.small-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+}
+
+.points-preview {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    margin-top: 15px;
+}
+</style>
+
+<div class="page-card">
 
 <h1>{{ $mode === 'create' ? 'Create Season' : 'Edit Season' }}</h1>
+
 <form method="POST"
-      action="{{ $mode === 'create' ? route('seasons.store') : route('seasons.update', $season, $worlds) }}">
+      action="{{ $mode === 'create'
+            ? route('seasons.store')
+            : route('seasons.update', $season) }}">
 
     @csrf
     @if($mode === 'edit')
         @method('PUT')
     @endif
 
-    {{-- TAB NAV --}}
-    <div style="margin-bottom: 20px;">
-        <button type="button" onclick="showTab('circuits')">Circuits</button>
-
-        @php
-            $selectedSeries = $series->firstWhere('id', $seriesId);
-        @endphp
-
-        @if($selectedSeries && $selectedSeries->is_multiclass)
-            <button type="button" onclick="showTab('classes')">Classes</button>
-        @endif
-
-        <button type="button" onclick="showTab('basic')">Basic Info</button>
+    <div class="tab-nav">
+        <button type="button" onclick="showTab('circuits', this)">Circuits</button>
+        <button type="button" onclick="showTab('classes', this)">Classes</button>
+        <button type="button" onclick="showTab('points', this)">Points</button>
+        <button type="button" onclick="showTab('basic', this)">Basic Info</button>
     </div>
 
     {{-- ===================== --}}
     {{-- CIRCUITS TAB --}}
     {{-- ===================== --}}
     <div id="circuits" class="tab-section">
-
-        <h3>Select Circuits</h3>
-
-        {{-- Selected Circuits List --}}
-        <div style="margin-bottom:20px; padding:10px; background:#f0f0f0;">
-            <strong>Selected Circuits (Drag to Reorder)</strong>
-            <ul id="selected-list"
-                style="list-style:none; padding:0; margin-top:10px;"></ul>
-        </div>
-
-        {{-- Available Circuits --}}
+        <h3>Season Calendar</h3>
+        <div id="selected-list"></div>
+        <hr>
+        <h4>Add Circuits</h4>
         <div style="display:flex; flex-wrap:wrap; gap:10px;">
             @foreach($layouts as $layout)
                 <div onclick="addCircuit(
@@ -60,361 +96,276 @@
                     '{{ addslashes($layout->track->name) }}',
                     '{{ addslashes($layout->name) }}',
                     '{{ addslashes($layout->track->city ?? '') }}',
-                    '{{ addslashes($layout->track->country ? $layout->track->country->name : '') }}'
+                    '{{ addslashes(optional($layout->track->country)->name ?? '') }}'
                 )"
-                     style="border:1px solid #ccc; padding:10px; cursor:pointer; width:200px;">
+                style="border:1px solid #ccc; padding:10px; cursor:pointer; width:200px; border-radius:6px;">
                     <strong>{{ $layout->track->name }}</strong><br>
-                    Layout: {{ $layout->name }}<br>
-                    Length: {{ $layout->length_km ?? 'N/A' }} km
+                    <small>{{ $layout->name }}</small>
                 </div>
             @endforeach
         </div>
-
     </div>
 
     {{-- ===================== --}}
     {{-- CLASSES TAB --}}
     {{-- ===================== --}}
     <div id="classes" class="tab-section" style="display:none;">
-
         <h3>Season Classes</h3>
-
-        <div id="class-list" style="margin-bottom:15px;">
-            {{-- JS will render classes here --}}
-        </div>
-
-        <div style="margin-top:10px;">
-            <button type="button" onclick="addClass()">+ Add Class</button>
-        </div>
-
+        <div id="class-list"></div>
+        <button type="button" onclick="addClass()" class="small-btn">+ Add Class</button>
     </div>
 
-    {{-- Hidden inputs --}}
-    <div id="class-inputs"></div>
-
     {{-- ===================== --}}
-    {{-- BASIC INFO TAB --}}
+    {{-- POINTS TAB --}}
     {{-- ===================== --}}
-    <div id="basic" class="tab-section" style="display:none;">
+    <div id="points" class="tab-section" style="display:none;">
+        <h3>Default Points System</h3>
 
-        <div>
-            <label>Select Series</label><br>
-            <select name="series_id" required>
-                @foreach($series as $s)
-                    <option value="{{ $s->id }}"
-                        {{ ($seriesId == $s->id) ? 'selected' : '' }}>
-                        {{ $s->name }}
+        <div style="display:flex; gap:10px; align-items:center;">
+            <select name="point_system_id" id="seasonPointSystem">
+                <option value="">-- No Points System --</option>
+                @foreach($pointSystems as $ps)
+                    <option value="{{ $ps->id }}"
+                        {{ optional($season)->point_system_id == $ps->id ? 'selected' : '' }}>
+                        {{ $ps->name }}
                     </option>
                 @endforeach
             </select>
+
+            <a href="{{ route('point-systems.create', ['season_id' => optional($season)->id]) }}"
+               class="small-btn"
+               style="background:#28a745; color:white; text-decoration:none;">
+                + Create
+            </a>
         </div>
 
-        <br>
-
-        <div>
-            <label>Season Year</label><br>
-            <input type="number"
-                   name="year"
-                   value="{{ old('year', $defaultYear) }}"
-                   required>
-        </div>
-
+        <div id="pointSystemPreview" class="points-preview"></div>
     </div>
 
-    {{-- Hidden circuit inputs --}}
-    <div id="circuit-inputs"></div>
+    {{-- ===================== --}}
+    {{-- BASIC INFO --}}
+    {{-- ===================== --}}
+    <div id="basic" class="tab-section" style="display:none;">
+        <label>Series</label><br>
+        <select name="series_id" required>
+            @foreach($series as $s)
+                <option value="{{ $s->id }}"
+                    {{ ($seriesId == $s->id) ? 'selected' : '' }}>
+                    {{ $s->name }}
+                </option>
+            @endforeach
+        </select>
 
-    {{-- Hidden class inputs --}}
+        <br><br>
+
+        <label>Season Year</label><br>
+        <input type="number"
+               name="year"
+               value="{{ old('year', $defaultYear) }}"
+               required>
+    </div>
+
+    <div id="circuit-inputs"></div>
     <div id="class-inputs"></div>
 
-    <br>
-    <hr>
+    <br><hr>
 
-    <button type="submit">
+    <button type="submit"
+            style="padding:10px 20px; background:#007bff; color:white; border:none; border-radius:6px;">
         {{ $mode === 'create' ? 'Create Season' : 'Update Season' }}
     </button>
 
 </form>
+</div>
 
-{{-- ===================== --}}
-{{-- JAVASCRIPT --}}
-{{-- ===================== --}}
 <script>
 
-    function showTab(tabId) {
-        document.querySelectorAll('.tab-section')
-            .forEach(tab => tab.style.display = 'none');
+function showTab(tabId, btn) {
+    document.querySelectorAll('.tab-section')
+        .forEach(tab => tab.style.display = 'none');
 
-        document.getElementById(tabId).style.display = 'block';
-    }
+    document.querySelectorAll('.tab-nav button')
+        .forEach(b => b.classList.remove('active'));
 
-    let selectedCircuits = [];
+    document.getElementById(tabId).style.display = 'block';
 
-    @if(isset($calendarRaces) && $calendarRaces->count())
-        selectedCircuits = [
-            @foreach($calendarRaces as $race)
-                {
-                    id: {{ $race->track_layout_id }},
-                    trackName: "{{ addslashes($race->layout->track->name) }}",
-                    layoutName: "{{ addslashes($race->layout->name) }}",
-                    city: "{{ addslashes($race->layout->track->city ?? '') }}",
-                    country: "{{ addslashes(optional($race->layout->track->country)->name ?? '') }}",
-                    gpName: "{{ addslashes($race->gp_name) }}",
-                    raceCode: "{{ $race->race_code }}",
-                    raceDate: "{{ $race->race_date }}"
-                }@if(!$loop->last),@endif
-            @endforeach
-        ];
-    @endif
+    if (btn) btn.classList.add('active');
+}
+showTab('circuits', document.querySelector('.tab-nav button'));
 
-    function addCircuit(id, trackName, layoutName, city, country) {
+const pointSystems = @json($pointSystems);
 
-        if (selectedCircuits.find(c => c.id === id)) return;
+/* ======================
+   POINT SYSTEM PREVIEW
+====================== */
+document.getElementById('seasonPointSystem')
+.addEventListener('change', function() {
 
-        selectedCircuits.push({
-            id,
-            trackName,
-            layoutName,
-            city,
-            country,
-            gpName: '',
-            raceCode: '',
-            raceDate: ''
+    const system = pointSystems.find(ps => ps.id == this.value);
+    const preview = document.getElementById('pointSystemPreview');
+    preview.innerHTML = '';
+
+    if (!system) return;
+
+    let html = '<strong>Race Points</strong><ul>';
+
+    system.rules
+        .filter(r => r.type === 'race')
+        .sort((a,b) => a.position - b.position)
+        .forEach(r => {
+            html += `<li>P${r.position} → ${r.points} pts</li>`;
         });
 
-        renderCircuits();
-    }
+    html += '</ul>';
 
-    function renderCircuits() {
+    preview.innerHTML = html;
+});
 
+/* ======================
+   CIRCUIT PRELOAD
+====================== */
+
+let selectedCircuits = [];
+
+@if(isset($calendarRaces) && $calendarRaces->count())
+selectedCircuits = [
+    @foreach($calendarRaces as $race)
+    {
+        id: {{ $race->track_layout_id }},
+        trackName: "{{ addslashes($race->layout->track->name) }}",
+        layoutName: "{{ addslashes($race->layout->name) }}",
+        city: "{{ addslashes($race->layout->track->city ?? '') }}",
+        country: "{{ addslashes(optional($race->layout->track->country)->name ?? '') }}",
+        gpName: "{{ addslashes($race->gp_name) }}",
+        raceCode: "{{ $race->race_code }}",
+        raceDate: "{{ $race->race_date }}",
+        pointSystemId: "{{ $race->point_system_id ?? '' }}"
+    }@if(!$loop->last),@endif
+    @endforeach
+];
+@endif
+
+function renderCircuits() {
     const list = document.getElementById('selected-list');
-    const inputContainer = document.getElementById('circuit-inputs');
-
+    const inputs = document.getElementById('circuit-inputs');
     list.innerHTML = '';
-    inputContainer.innerHTML = '';
+    inputs.innerHTML = '';
 
-        selectedCircuits.forEach((circuit, index) => {
+    selectedCircuits.forEach((c,i) => {
 
-            const li = document.createElement('li');
-            li.draggable = true;
-            li.dataset.index = index;
+        const div = document.createElement('div');
+        div.className = "circuit-card";
 
-            li.style.display = "flex";
-            li.style.alignItems = "center";
-            li.style.gap = "10px";
-            li.style.padding = "8px";
-            li.style.border = "1px solid #ccc";
-            li.style.marginBottom = "6px";
-            li.style.background = "#fff";
-            li.style.cursor = "move";
+        div.innerHTML = `
+            <strong>Round ${i+1}</strong><br><br>
 
-            li.innerHTML = `
-                <strong style="width:50px;">R${index + 1}</strong>
+            <input type="text" value="${c.gpName}"
+                placeholder="Grand Prix Name"
+                oninput="selectedCircuits[${i}].gpName=this.value; renderCircuits();">
 
-                <input type="text"
-                    placeholder="Grand Prix Name"
-                    value="${circuit.gpName}"
-                    style="flex:2;"
-                    oninput="updateGPName(${index}, this.value)">
+            <input type="text" maxlength="3"
+                value="${c.raceCode}"
+                placeholder="CODE"
+                oninput="selectedCircuits[${i}].raceCode=this.value.toUpperCase(); renderCircuits();">
 
-                <input type="text"
-                    maxlength="3"
-                    placeholder="CODE"
-                    value="${circuit.raceCode}"
-                    style="width:70px; text-transform:uppercase;"
-                    oninput="updateRaceCode(${index}, this.value.toUpperCase())">
+            <input type="date"
+                value="${c.raceDate || ''}"
+                onchange="selectedCircuits[${i}].raceDate=this.value; renderCircuits();">
 
-                <input type="date"
-                    value="${circuit.raceDate || ''}"
-                    style="width:150px;"
-                    onchange="updateRaceDate(${index}, this.value)">
+            <br><br>
 
-                <div style="flex:3;">
-                    <strong>${circuit.trackName}</strong>
-                    <span style="color:#777;">
-                        (${circuit.layoutName})
-                    </span>
-                </div>
+            ${c.trackName} (${c.layoutName}) - ${c.city}, ${c.country}
 
-                <div style="flex:2; color:#555;">
-                    ${circuit.city}, ${circuit.country}
-                </div>
+            <br><br>
 
-                <button type="button"
-                        style="background:#d9534f; color:white; border:none; padding:4px 8px;"
-                        onclick="removeCircuit(${index})">
-                    ✕
-                </button>
-            `;
+            <label>Override Points</label>
+            <select onchange="selectedCircuits[${i}].pointSystemId=this.value; renderCircuits();">
+                <option value="">Season Default</option>
+                ${pointSystems.map(ps =>
+                    `<option value="${ps.id}"
+                     ${c.pointSystemId == ps.id ? 'selected' : ''}>
+                     ${ps.name}
+                     </option>`
+                ).join('')}
+            </select>
 
-            li.addEventListener('dragstart', dragStart);
-            li.addEventListener('dragover', dragOver);
-            li.addEventListener('drop', drop);
+            <button type="button"
+                onclick="selectedCircuits.splice(${i},1); renderCircuits();"
+                class="small-btn">Remove</button>
+        `;
 
-            list.appendChild(li);
+        list.appendChild(div);
 
-            updateHiddenInputs();
-        });
-    }
+        inputs.innerHTML += `
+            <input type="hidden" name="circuits[${i}][layout_id]" value="${c.id}">
+            <input type="hidden" name="circuits[${i}][gp_name]" value="${c.gpName}">
+            <input type="hidden" name="circuits[${i}][race_code]" value="${c.raceCode}">
+            <input type="hidden" name="circuits[${i}][race_date]" value="${c.raceDate || ''}">
+            <input type="hidden" name="circuits[${i}][point_system_id]" value="${c.pointSystemId}">
+        `;
+    });
+}
+renderCircuits();
 
-    function updateHiddenInputs() {
-        const inputContainer = document.getElementById('circuit-inputs');
-        inputContainer.innerHTML = '';
-
-        selectedCircuits.forEach((circuit, index) => {
-
-            inputContainer.innerHTML += `
-                <input type="hidden" name="circuits[${index}][layout_id]" value="${circuit.id}">
-                <input type="hidden" name="circuits[${index}][gp_name]" value="${circuit.gpName}">
-                <input type="hidden" name="circuits[${index}][race_code]" value="${circuit.raceCode}">
-                <input type="hidden" name="circuits[${index}][race_date]" value="${circuit.raceDate || ''}">
-            `;
-        });
-    }
-
-    function updateRaceDate(index, value) {
-        selectedCircuits[index].raceDate = value;
-        updateHiddenInputs();
-    }
-
-    function removeCircuit(index) {
-        selectedCircuits.splice(index, 1);
-        renderCircuits();
-    }
-
-
-    function updateGPName(index, value) {
-        selectedCircuits[index].gpName = value;
-        updateHiddenInputs();
-    }
-
-    function updateRaceCode(index, value) {
-        selectedCircuits[index].raceCode = value;
-        updateHiddenInputs();
-    }
-
-    let draggedIndex = null;
-
-    function dragStart(e) {
-        draggedIndex = e.target.dataset.index;
-    }
-
-    function dragOver(e) {
-        e.preventDefault();
-    }
-
-    function drop(e) {
-        const targetIndex = e.target.closest('li').dataset.index;
-
-        const temp = selectedCircuits[draggedIndex];
-        selectedCircuits.splice(draggedIndex, 1);
-        selectedCircuits.splice(targetIndex, 0, temp);
-
-        renderCircuits();
-    }
-
-    renderCircuits();
-    showTab('circuits');
-
-    // =========================
-// CLASS LOGIC
-// =========================
+/* ======================
+   CLASS PRELOAD
+====================== */
 
 let seasonClasses = [];
 
-// 🔥 Load existing classes (edit mode)
 @if(isset($season) && $season->classes && $season->classes->count())
-    seasonClasses = [
-        @foreach($season->classes as $class)
-            {
-                name: "{{ addslashes($class->name) }}"
-            }@if(!$loop->last),@endif
-        @endforeach
-    ];
+seasonClasses = [
+    @foreach($season->classes as $class)
+        { name: "{{ addslashes($class->name) }}" }@if(!$loop->last),@endif
+    @endforeach
+];
 @endif
-
-function addClass() {
-    seasonClasses.push({
-        name: ''
-    });
-
-    renderClasses();
-}
-
-function removeClass(index) {
-    seasonClasses.splice(index, 1);
-    renderClasses();
-}
-
-function updateClassName(index, value) {
-    seasonClasses[index].name = value;
-    updateClassHiddenInputs();
-}
 
 function renderClasses() {
 
     const list = document.getElementById('class-list');
+    const inputs = document.getElementById('class-inputs');
+
     list.innerHTML = '';
+    inputs.innerHTML = '';
 
-    if (seasonClasses.length === 0) {
-        list.innerHTML = `
-            <div style="color:#777; font-style:italic;">
-                No classes added. If left empty, a default "Overall" class will be created.
-            </div>
-        `;
-    }
+    seasonClasses.forEach((c,i) => {
 
-    seasonClasses.forEach((cls, index) => {
+        const div = document.createElement('div');
+        div.className = "class-row";
 
-        const row = document.createElement('div');
-
-        row.style.display = "flex";
-        row.style.alignItems = "center";
-        row.style.gap = "10px";
-        row.style.marginBottom = "8px";
-        row.style.padding = "6px";
-        row.style.border = "1px solid #ddd";
-        row.style.background = "#fafafa";
-
-        row.innerHTML = `
-            <strong style="width:40px;">${index + 1}</strong>
-
+        div.innerHTML = `
             <input type="text"
-                   placeholder="Class Name (e.g. Hypercar)"
-                   value="${cls.name}"
-                   style="flex:1;"
-                   oninput="updateClassName(${index}, this.value)">
-
+                value="${c.name}"
+                oninput="seasonClasses[${i}].name=this.value; renderClasses();">
             <button type="button"
-                    style="background:#d9534f; color:white; border:none; padding:4px 8px;"
-                    onclick="removeClass(${index})">
-                ✕
-            </button>
+                onclick="seasonClasses.splice(${i},1); renderClasses();"
+                class="small-btn">✕</button>
         `;
 
-        list.appendChild(row);
-    });
+        list.appendChild(div);
 
-    updateClassHiddenInputs();
-}
-
-function updateClassHiddenInputs() {
-
-    const container = document.getElementById('class-inputs');
-    container.innerHTML = '';
-
-    seasonClasses.forEach((cls, index) => {
-
-        container.innerHTML += `
-            <input type="hidden" name="classes[${index}]" value="${cls.name}">
-        `;
+        inputs.innerHTML += `<input type="hidden" name="classes[${i}]" value="${c.name}">`;
     });
 }
-
-// Initial render
 renderClasses();
 
-</script>
+function addClass(){
+    seasonClasses.push({name:''});
+    renderClasses();
+}
 
+function addCircuit(id, trackName, layoutName, city, country){
+    if (selectedCircuits.find(c => c.id === id)) return;
+
+    selectedCircuits.push({
+        id, trackName, layoutName, city, country,
+        gpName:'', raceCode:'', raceDate:'', pointSystemId:''
+    });
+
+    renderCircuits();
+}
+
+</script>
 
 @endsection

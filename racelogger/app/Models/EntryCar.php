@@ -32,4 +32,14 @@ class EntryCar extends Model
             'entry_car_driver' // <-- explicitly define table
         )->withTimestamps();
     }
+
+    public function results()
+    {
+        return $this->hasMany(Result::class);
+    }
+
+    public function qualifyingResults()
+    {
+        return $this->hasMany(QualifyingResult::class);
+    }
 }

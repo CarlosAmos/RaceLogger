@@ -23,7 +23,7 @@ class Driver extends Model
     {
         return $this->belongsTo(Country::class);
     }
-    
+
     public function lapRecords()
     {
         return $this->hasMany(LapRecord::class);
@@ -40,5 +40,10 @@ class Driver extends Model
             EntryCar::class,
             'entry_car_driver' // <-- explicitly define table
         )->withTimestamps();
+    }
+
+    public function resultAppearances()
+    {
+        return $this->hasMany(ResultDriver::class);
     }
 }

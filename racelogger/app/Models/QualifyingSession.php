@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class QualifyingSession extends Model
+{
+    protected $fillable = [
+        'calendar_race_id',
+        'name',
+        'session_order',
+        'is_elimination',
+        'final_target',
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
+    public function calendarRace()
+    {
+        return $this->belongsTo(CalendarRace::class);
+    }
+
+    public function results()
+    {
+        return $this->hasMany(QualifyingResult::class)
+            ->orderBy('position');
+    }
+}

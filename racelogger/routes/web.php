@@ -24,6 +24,8 @@ use App\Http\Controllers\WorldEngineController;
 use App\Http\Controllers\EntryCarController;
 use App\Http\Controllers\WorldDriverController;
 use App\Http\Controllers\EntryCarDriverController;
+use App\Http\Controllers\PointSystemController;
+use App\Http\Controllers\RaceWeekendController;
 
 
 Route::get('/', function () {
@@ -116,3 +118,14 @@ Route::prefix('worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entr
         Route::post('drivers', [EntryCarDriverController::class, 'update'])
             ->name('entry-cars.drivers.update');
     });
+
+Route::resource('point-systems', PointSystemController::class);
+
+Route::get('/races/{race}', [RaceWeekendController::class, 'show'])
+    ->name('races.show');
+
+Route::post(
+    '/races/{race}/weekend',
+    [RaceWeekendController::class, 'update']
+)
+    ->name('races.weekend.update');
