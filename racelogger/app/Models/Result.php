@@ -7,16 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 class Result extends Model
 {
     protected $fillable = [
-        'calendar_race_id',
+        'race_session_id',
         'entry_car_id',
         'position',
+        'class_position',
         'status',
-        'gap_to_leader_ms',
         'laps_completed',
+        'gap_to_leader_ms',
+        'gap_laps_down',
         'fastest_lap_time_ms',
         'fastest_lap',
         'points_awarded',
     ];
+
+    public function raceSession()
+    {
+        return $this->belongsTo(RaceSession::class);
+    }
 
     protected $casts = [
         'fastest_lap' => 'boolean',

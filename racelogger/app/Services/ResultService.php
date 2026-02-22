@@ -6,6 +6,7 @@ use App\Models\Result;
 use App\Models\ResultDriver;
 use App\Models\CalendarRace;
 use App\Models\EntryCar;
+use App\Models\RaceSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Services\Points\PointsCalculationService;
@@ -23,39 +24,57 @@ class ResultService
 
     public function saveRaceResults(array $data): void
     {
-        $race = CalendarRace::with([
-            'season.pointSystem',
-            'pointSystem',
-            'qualifyingSessions.results'
-        ])->findOrFail($data['calendar_race_id']);
+        if (empty($data['race_session_id'])) {
+            throw ValidationException::withMessages([
+                'race_session_id' => 'Race session is required.'
+            ]);
+        }
+
+        $raceSession = \App\Models\RaceSession::with([
+            'calendarRace.season.pointSystem.bonusRules',
+            'calendarRace.pointSystem.bonusRules',
+            'calendarRace.entryCars.entryClass',
+            'calendarRace.qualifyingSessions.results'
+        ])->findOrFail($data['race_session_id']);
+
+        $race = $raceSession->calendarRace;
 
         if ($race->isLocked()) {
             throw ValidationException::withMessages([
                 'race' => 'This race is locked and cannot be modified.'
             ]);
         }
-        $this->validateRaceResults($race, $data);
 
+        $this->validateRaceResults($race, $data);
+        $this->calculateClassPositions($race, $data['results']);
+        // Calculate points
         $this->pointsService->calculateWeekendPoints($race, $data['results']);
 
-        DB::transaction(function () use ($data, $race) {
+        DB::transaction(function () use ($data, $raceSession) {
 
-            Result::where('calendar_race_id', $race->id)->delete();
+            // Delete old results for this session only
+            Result::where('race_session_id', $raceSession->id)->delete();
 
             foreach ($data['results'] as $resultData) {
 
-                $drivers = $resultData['drivers'];
+                if (empty($resultData['entry_car_id'])) {
+                    continue;
+                }
+
                 unset($resultData['drivers']);
 
-                $resultData['calendar_race_id'] = $race->id;
+                $resultData['race_session_id'] = $raceSession->id;
 
                 $result = Result::create($resultData);
 
-                $this->freezeDrivers($result->id, $drivers);
+                // Freeze drivers directly from entry car
+                $this->freezeDriversFromEntryCar(
+                    $result,
+                    $resultData['entry_car_id']
+                );
             }
         });
     }
-
     /*
     |--------------------------------------------------------------------------
     | Validation Layer
@@ -70,34 +89,63 @@ class ResultService
             ]);
         }
 
-        $entryCars = [];
         $positions = [];
         $fastestLapCandidate = null;
 
+        /*
+    |--------------------------------------------------------------------------
+    | First Pass — Validate & Detect Fastest Lap
+    |--------------------------------------------------------------------------
+    */
+
         foreach ($data['results'] as $index => &$result) {
+            // Convert fastest lap string to milliseconds
+            if (!empty($result['fastest_lap'])) {
+                $result['fastest_lap_time_ms'] =
+                    $this->convertLapToMs($result['fastest_lap']);
+            } else {
+                $result['fastest_lap_time_ms'] = null;
+            }
+            // Convert gap input
+            if (!empty($result['gap'])) {
 
-            $entryCar = EntryCar::with('drivers')
-                ->where('id', $result['entry_car_id'])
-                ->first();
+                $gap = trim($result['gap']);
 
-            // 1️⃣ Entry car must belong to season
+                // If format is +XL
+                if (preg_match('/^\+(\d+)L$/i', $gap, $matches)) {
+
+                    $result['gap_laps_down'] = (int) $matches[1];
+                    $result['gap_to_leader_ms'] = null;
+                } else {
+
+                    // Convert time format m:ss:ms
+                    $ms = $this->convertLapToMs($gap);
+
+                    $result['gap_to_leader_ms'] = $ms;
+                    $result['gap_laps_down'] = null;
+                }
+            } else {
+
+                $result['gap_to_leader_ms'] = null;
+                $result['gap_laps_down'] = null;
+            }
+
+            // Skip empty rows
+            if (empty($result['entry_car_id'])) {
+                continue;
+            }
+
+            $entryCar = $race->entryCars
+                ->firstWhere('id', $result['entry_car_id']);
+
             if (!$entryCar) {
                 throw ValidationException::withMessages([
                     "results.$index.entry_car_id" =>
-                    'Entry car does not belong to this race season.'
+                    'Entry car does not belong to this race.'
                 ]);
             }
 
-            // 2️⃣ Unique entry cars
-            if (in_array($result['entry_car_id'], $entryCars)) {
-                throw ValidationException::withMessages([
-                    "results.$index.entry_car_id" =>
-                    'Duplicate entry car detected.'
-                ]);
-            }
-            $entryCars[] = $result['entry_car_id'];
-
-            // 3️⃣ Status validation
+            // Status validation
             if (!in_array($result['status'], $this->allowedStatuses)) {
                 throw ValidationException::withMessages([
                     "results.$index.status" =>
@@ -105,32 +153,24 @@ class ResultService
                 ]);
             }
 
-            // 4️⃣ Position validation
-            if (!is_null($result['position'])) {
-
-                if (in_array($result['position'], $positions)) {
-                    throw ValidationException::withMessages([
-                        "results.$index.position" =>
-                        'Duplicate finishing position detected.'
-                    ]);
-                }
-
-                $positions[] = $result['position'];
-
-                if ($result['status'] === 'finished' && !$result['position']) {
-                    throw ValidationException::withMessages([
-                        "results.$index.position" =>
-                        'Finished cars must have a position.'
-                    ]);
-                }
+            // Position validation (overall unique)
+            if (is_null($result['position'])) {
+                throw ValidationException::withMessages([
+                    "results.$index.position" =>
+                    'Overall position is required.'
+                ]);
             }
 
-            // 5️⃣ Leader gap rule
-            if ($result['position'] === 1) {
-                $result['gap_to_leader_ms'] = null;
+            if (in_array($result['position'], $positions)) {
+                throw ValidationException::withMessages([
+                    "results.$index.position" =>
+                    'Duplicate overall finishing position detected.'
+                ]);
             }
 
-            // 6️⃣ Laps validation
+            $positions[] = $result['position'];
+
+            // Laps validation
             if (($result['laps_completed'] ?? 0) < 0) {
                 throw ValidationException::withMessages([
                     "results.$index.laps_completed" =>
@@ -138,33 +178,13 @@ class ResultService
                 ]);
             }
 
-            // 7️⃣ Drivers must belong to entry car
-            $entryDriverIds = $entryCar->drivers->pluck('id')->toArray();
-
-            if (empty($result['drivers'])) {
-                throw ValidationException::withMessages([
-                    "results.$index.drivers" =>
-                    'At least one driver must be assigned.'
-                ]);
+            // Leader gap rule
+            if ($result['position'] == 1) {
+                $result['gap_to_leader_ms'] = null;
+                $result['gap_laps_down'] = null;
             }
 
-            foreach ($result['drivers'] as $driverId) {
-                if (!in_array($driverId, $entryDriverIds)) {
-                    throw ValidationException::withMessages([
-                        "results.$index.drivers" =>
-                        'Driver does not belong to this entry car.'
-                    ]);
-                }
-            }
-
-            if (count($result['drivers']) !== count(array_unique($result['drivers']))) {
-                throw ValidationException::withMessages([
-                    "results.$index.drivers" =>
-                    'Duplicate drivers detected.'
-                ]);
-            }
-
-            // 8️⃣ Auto detect fastest lap
+            // Detect fastest lap
             if (
                 !is_null($result['fastest_lap_time_ms']) &&
                 $result['status'] === 'finished'
@@ -181,24 +201,123 @@ class ResultService
                 }
             }
 
-            // Always reset fastest_lap (we determine it)
+            // Reset fastest flag (we decide)
             $result['fastest_lap'] = false;
         }
 
-        // Apply fastest lap automatically
+        /*
+    |--------------------------------------------------------------------------
+    | Apply Fastest Lap
+    |--------------------------------------------------------------------------
+    */
+
         if ($fastestLapCandidate) {
             $data['results'][$fastestLapCandidate['index']]['fastest_lap'] = true;
         }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Second Pass — Compute Class Positions
+    |--------------------------------------------------------------------------
+    */
+
+        // Sort results by overall position
+        usort($data['results'], function ($a, $b) {
+            return ($a['position'] ?? 9999) <=> ($b['position'] ?? 9999);
+        });
+
+        $classPositions = [];
+
+        foreach ($data['results'] as &$result) {
+
+            if (empty($result['entry_car_id'])) {
+                continue;
+            }
+
+            $entryCar = $race->entryCars
+                ->firstWhere('id', $result['entry_car_id']);
+
+            $classId = $entryCar->entryClass->race_class_id;
+
+            if (!isset($classPositions[$classId])) {
+                $classPositions[$classId] = 1;
+            }
+
+            $result['class_position'] = $classPositions[$classId];
+
+            $classPositions[$classId]++;
+        }
     }
 
-    protected function freezeDrivers(int $resultId, array $driverIds): void
+    protected function freezeDriversFromEntryCar($result, int $entryCarId): void
     {
-        foreach ($driverIds as $index => $driverId) {
-            ResultDriver::create([
-                'result_id' => $resultId,
-                'driver_id' => $driverId,
+        $entryCar = \App\Models\EntryCar::with('drivers')
+            ->find($entryCarId);
+
+        if (!$entryCar) return;
+
+        foreach ($entryCar->drivers as $index => $driver) {
+
+            \App\Models\ResultDriver::create([
+                'result_id'    => $result->id,
+                'driver_id'    => $driver->id,
                 'driver_order' => $index + 1,
             ]);
+        }
+    }
+
+    protected function convertLapToMs(?string $lap): ?int
+    {
+        if (!$lap) return null;
+
+        $parts = explode(':', $lap);
+
+        if (count($parts) !== 3) return null;
+
+        [$minutes, $seconds, $milliseconds] = $parts;
+
+        if (!is_numeric($minutes) || !is_numeric($seconds) || !is_numeric($milliseconds)) {
+            return null;
+        }
+
+        return ((int)$minutes * 60000)
+            + ((int)$seconds * 1000)
+            + (int)$milliseconds;
+    }
+
+    protected function calculateClassPositions($race, array &$results): void
+    {
+        $classPositions = [];
+
+        // Only classify cars that actually have a finishing position
+        $sorted = collect($results)
+            ->filter(function ($result) {
+                return !is_null($result['position']);
+            })
+            ->sortBy('position')
+            ->values();
+
+        foreach ($sorted as $sortedResult) {
+
+            $entryCar = $race->entryCars
+                ->firstWhere('id', $sortedResult['entry_car_id']);
+
+            if (!$entryCar) continue;
+
+            $classId = $entryCar->entryClass->race_class_id;
+
+            if (!isset($classPositions[$classId])) {
+                $classPositions[$classId] = 1;
+            }
+
+            // Apply class position back to original array
+            foreach ($results as &$result) {
+                if ($result['entry_car_id'] == $sortedResult['entry_car_id']) {
+                    $result['class_position'] = $classPositions[$classId];
+                }
+            }
+
+            $classPositions[$classId]++;
         }
     }
 }

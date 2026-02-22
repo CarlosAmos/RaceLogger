@@ -17,6 +17,36 @@
         ];
     })->sortBy('display_order')->values();
 @endphp
+@php
+    $savedSessions = $race->qualifyingSessions
+        ->sortBy('session_order')
+        ->map(function ($session) {
+            return [
+                'session_order' => $session->session_order,
+                'name' => $session->name,
+                'is_elimination' => $session->is_elimination,
+                'final_target' => $session->final_target,
+                'results' => $session->results->map(function ($result) {
+                    return [
+                        'entry_car_id' => $result->entry_car_id,
+                        'position' => $result->position,
+                        'best_lap' => msToLap($result->best_lap_time_ms),
+                    ];
+                })->values()
+            ];
+        })->values();
+@endphp
+@php
+    function msToLap($ms) {
+        if (!$ms) return null;
+
+        $minutes = floor($ms / 60000);
+        $seconds = floor(($ms % 60000) / 1000);
+        $milliseconds = $ms % 1000;
+
+        return sprintf('%d:%02d:%03d', $minutes, $seconds, $milliseconds);
+    }
+@endphp
 
 <div class="card shadow-sm">
 <div class="card-body">
@@ -81,9 +111,24 @@ const finalTargetInput = document.getElementById('final-target');
 const finalTargetContainer = document.getElementById('final-target-container');
 const tabsContainer = document.getElementById('session-tabs');
 const contentContainer = document.getElementById('session-content');
+const savedSessions = @json($savedSessions);
 
 const classGroups = @json($classGroups);
 const totalParticipants = {{ $raceCars->count() }};
+let hasSavedSessions = savedSessions.length > 0;
+console.log(savedSessions);
+if (hasSavedSessions) {
+
+    formatSelect.value = savedSessions.length;
+
+    eliminationCheckbox.checked =
+        savedSessions[0].is_elimination ? true : false;
+
+    if (savedSessions[0].is_elimination) {
+        finalTargetContainer.style.display = 'block';
+        finalTargetInput.value = savedSessions[0].final_target;
+    }
+}
 
 function calculateEliminations(sessionCount, finalTarget) {
 
@@ -222,6 +267,9 @@ function renderSessions() {
 
     attachLapFormatting();
     attachDuplicateProtection();
+    if (hasSavedSessions) {
+        populateSavedData();
+    }
 }
 
 function attachDuplicateProtection() {
@@ -283,6 +331,51 @@ function attachLapFormatting() {
                 input.value = formatted;
             });
         });
+}
+
+function populateSavedData() {
+
+    savedSessions.forEach((session, sessionIndex) => {
+
+        session.results.forEach(result => {
+
+            if (!result.entry_car_id) return;
+
+            // Find all selects in this session
+            const selects = document.querySelectorAll(
+                `select[name^="qualifying[sessions][${sessionIndex}]"]`
+            );
+
+            selects.forEach(select => {
+
+                const option = select.querySelector(
+                    `option[value="${result.entry_car_id}"]`
+                );
+
+                if (!option) return;
+
+                const row = select.closest('tr');
+                const positionInput = row.querySelector('input[type="hidden"]');
+
+                if (!positionInput) return;
+
+                if (parseInt(positionInput.value) === parseInt(result.position)) {
+
+                    select.value = result.entry_car_id;
+                    select.dispatchEvent(new Event('change'));
+
+                    const lapInput = row.querySelector('.lap-time-input');
+
+                    if (lapInput && result.best_lap) {
+                        lapInput.value = result.best_lap;
+                    }
+                }
+            });
+
+        });
+
+    });
+
 }
 
 eliminationCheckbox.addEventListener('change', function () {

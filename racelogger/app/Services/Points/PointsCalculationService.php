@@ -7,80 +7,157 @@ use Illuminate\Validation\ValidationException;
 
 class PointsCalculationService
 {
-    public function calculateWeekendPoints(CalendarRace $race, array &$results): void
+    public function calculateWeekendPoints($race, array &$results): void
     {
-        $pointSystem = $this->resolvePointSystem($race);
+        $pointSystem = $race->pointSystem
+            ?? $race->season->pointSystem;
 
-        $raceRules = $pointSystem->rules()
-            ->where('type', 'race')
-            ->get()
-            ->keyBy('position');
+        if (!$pointSystem) {
+            foreach ($results as &$result) {
+                $result['points_awarded'] = 0;
+            }
+            return;
+        }
 
-        $qualifyingRules = $pointSystem->rules()
-            ->where('type', 'qualifying')
-            ->get()
-            ->keyBy('position');
+        $pointSystem->load(['rules', 'bonusRules']);
 
-        $fastestLapRule = $pointSystem->bonusRules()
-            ->where('type', 'fastest_lap')
-            ->first();
+        $rules = $pointSystem->rules;
+        $bonusRules = $pointSystem->bonusRules;
 
-        // Get qualifying results grouped by entry_car
-        $qualifyingPointsByEntryCar = $this->calculateQualifyingPoints($race, $qualifyingRules);
+        $raceRules = $rules->where('type', 'race');
+        $qualifyingRules = $rules->where('type', 'qualifying');
+
+        $fastestLapRule = $bonusRules
+            ->firstWhere('type', 'fastest_lap');
+
+        /*
+    |--------------------------------------------------------------------------
+    | 1️⃣ Base Race Points
+    |--------------------------------------------------------------------------
+    */
 
         foreach ($results as &$result) {
 
+            if (empty($result['entry_car_id'])) {
+                continue;
+            }
+
             $points = 0;
 
-            // 🏁 Race Position Points
-            if (
-                $result['status'] === 'finished' &&
-                !is_null($result['position'])
-            ) {
-                $rule = $raceRules->get($result['position']);
+            $classPosition = $result['class_position'] ?? null;
+
+            if ($classPosition) {
+
+                $rule = $raceRules
+                    ->firstWhere('position', $classPosition);
+
                 if ($rule) {
                     $points += $rule->points;
                 }
             }
 
-            // ⚡ Fastest Lap Bonus
-            if (!empty($result['fastest_lap']) && $fastestLapRule) {
+            $result['points_awarded'] = $points;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | 2️⃣ Qualifying Points (Final Session Only)
+    |--------------------------------------------------------------------------
+    */
+
+        if ($qualifyingRules->isNotEmpty()) {
+
+            $finalSession = $race->qualifyingSessions
+                ->sortByDesc('session_order')
+                ->first();
+
+            if ($finalSession && $finalSession->results->isNotEmpty()) {
+
+                $classQualifyingPositions = [];
+
+                foreach (
+                    $finalSession->results->sortBy('position')
+                    as $qualiResult
+                ) {
+
+                    $entryCar = $race->entryCars
+                        ->firstWhere('id', $qualiResult->entry_car_id);
+
+                    if (!$entryCar) continue;
+
+                    $classId = $entryCar->entryClass->race_class_id;
+
+                    if (!isset($classQualifyingPositions[$classId])) {
+                        $classQualifyingPositions[$classId] = 1;
+                    }
+
+                    $classPosition =
+                        $classQualifyingPositions[$classId];
+
+                    $rule = $qualifyingRules
+                        ->firstWhere('position', $classPosition);
+
+                    if ($rule) {
+
+                        foreach ($results as &$result) {
+
+                            if (
+                                $result['entry_car_id'] ==
+                                $qualiResult->entry_car_id
+                            ) {
+                                $result['points_awarded'] +=
+                                    $rule->points;
+                            }
+                        }
+                    }
+
+                    $classQualifyingPositions[$classId]++;
+                }
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | 3️⃣ Fastest Lap Bonus
+    |--------------------------------------------------------------------------
+    */
+
+        if ($fastestLapRule) {
+
+            foreach ($results as &$result) {
+
+                if (
+                    empty($result['fastest_lap']) ||
+                    empty($result['entry_car_id'])
+                ) {
+                    continue;
+                }
 
                 $eligible = true;
 
-                // Must finish?
-                if ($fastestLapRule->requires_finish && $result['status'] !== 'finished') {
+                if (
+                    $fastestLapRule->requires_finish &&
+                    $result['status'] !== 'finished'
+                ) {
                     $eligible = false;
                 }
 
-                // Minimum position required?
                 if (
-                    $fastestLapRule->min_position_required &&
+                    !is_null($fastestLapRule->min_position_required) &&
                     (
-                        is_null($result['position']) ||
-                        $result['position'] > $fastestLapRule->min_position_required
+                        is_null($result['class_position']) ||
+                        $result['class_position'] >
+                        $fastestLapRule->min_position_required
                     )
                 ) {
                     $eligible = false;
                 }
 
                 if ($eligible) {
-                    $points += $fastestLapRule->points;
+                    $result['points_awarded'] +=
+                        $fastestLapRule->points;
                 }
             }
-
-            // 🟣 Qualifying Points
-            $entryCarId = $result['entry_car_id'];
-            if (isset($qualifyingPointsByEntryCar[$entryCarId])) {
-                $points += $qualifyingPointsByEntryCar[$entryCarId];
-            }
-
-            // ✏ Manual override (final authority)
-            if (isset($result['points_override'])) {
-                $points = $result['points_override'];
-            }
-
-            $result['points_awarded'] = $points;
         }
     }
 

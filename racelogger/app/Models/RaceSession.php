@@ -9,9 +9,17 @@ class RaceSession extends Model
     protected $fillable = [
         'calendar_race_id',
         'name',
-        'type',
         'session_order',
+        'is_sprint',
+        'reverse_grid',
+        'reverse_grid_from_position',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function calendarRace()
     {
@@ -23,4 +31,3 @@ class RaceSession extends Model
         return $this->hasMany(Result::class);
     }
 }
-

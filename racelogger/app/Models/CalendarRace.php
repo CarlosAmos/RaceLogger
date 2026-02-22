@@ -31,10 +31,6 @@ class CalendarRace extends Model
         return $this->belongsTo(PointSystem::class);
     }
 
-    public function results()
-    {
-        return $this->hasMany(Result::class);
-    }
 
     public function qualifyingSessions()
     {
@@ -47,10 +43,7 @@ class CalendarRace extends Model
 |--------------------------------------------------------------------------
 */
 
-    public function isComplete(): bool
-    {
-        return $this->results()->exists();
-    }
+
 
     public function hasQualifying(): bool
     {
@@ -95,5 +88,21 @@ class CalendarRace extends Model
         );
     }
 
+    public function raceSessions()
+    {
+        return $this->hasMany(RaceSession::class)
+            ->orderBy('session_order');
+    }
 
+    public function results()
+    {
+        return $this->hasManyThrough(
+            \App\Models\Result::class,
+            \App\Models\RaceSession::class,
+            'calendar_race_id', // Foreign key on race_sessions
+            'race_session_id',  // Foreign key on results
+            'id',               // Local key on calendar_races
+            'id'                // Local key on race_sessions
+        );
+    }
 }

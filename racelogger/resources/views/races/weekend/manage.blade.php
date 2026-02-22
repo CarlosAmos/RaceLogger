@@ -95,10 +95,22 @@
 
         </div>
 
-        <div class="mt-4 text-end">
-            <button type="submit" class="btn btn-primary btn-lg">
+        <div class="mt-4 d-flex justify-content-between">
+
+            <button type="submit"
+                    name="action"
+                    value="save"
+                    class="btn btn-primary btn-lg">
                 Save Weekend
             </button>
+
+            <button type="submit"
+                    name="action"
+                    value="complete"
+                    class="btn btn-success btn-lg">
+                Complete Weekend
+            </button>
+
         </div>
 
     </form>
