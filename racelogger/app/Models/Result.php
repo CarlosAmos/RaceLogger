@@ -60,4 +60,9 @@ class Result extends Model
         )->withPivot('driver_order')
         ->orderBy('pivot_driver_order');
     }
+
+    public function resultDrivers()
+    {
+        return $this->hasMany(ResultDriver::class);
+    }
 }
