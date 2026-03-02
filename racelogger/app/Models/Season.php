@@ -58,5 +58,11 @@ class Season extends Model
     {
         return $this->belongsTo(PointSystem::class);
     }
+
+    public function world()
+    {
+        return $this->belongsTo(World::class);
+    }
+    
 }
 

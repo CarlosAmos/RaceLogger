@@ -77,8 +77,9 @@
     <div class="tab-nav">
         <button type="button" onclick="showTab('circuits', this)">Circuits</button>
         <button type="button" onclick="showTab('classes', this)">Classes</button>
+        <button type="button" onclick="showTab('teams', this)">Teams</button>
         <button type="button" onclick="showTab('points', this)">Points</button>
-        <button type="button" onclick="showTab('basic', this)">Basic Info</button>
+        <button type="button" onclick="showTab('basic', this)">Basic Info</button>        
     </div>
 
     {{-- ===================== --}}
@@ -113,8 +114,14 @@
         <h3>Season Classes</h3>
         <div id="class-list"></div>
         <button type="button" onclick="addClass()" class="small-btn">+ Add Class</button>
-    </div>
 
+    </div>
+    {{-- ===================== --}}
+    {{-- TEAMS TAB --}}
+    {{-- ===================== --}}
+    <div id="teams" class="tab-section" style="display:none;">
+        <div id="team-class-list"></div>
+    </div>
     {{-- ===================== --}}
     {{-- POINTS TAB --}}
     {{-- ===================== --}}
@@ -324,6 +331,7 @@ seasonClasses = [
 function renderClasses() {
 
     const list = document.getElementById('class-list');
+    const teamClassList = document.getElementById('team-class-list');
     const inputs = document.getElementById('class-inputs');
 
     list.innerHTML = '';
@@ -344,9 +352,28 @@ function renderClasses() {
         `;
 
         list.appendChild(div);
-
         inputs.innerHTML += `<input type="hidden" name="classes[${i}]" value="${c.name}">`;
     });
+
+    seasonClasses.forEach((c,i) => {
+
+        const div = document.createElement('div');
+        div.className = "class-row";
+
+        div.innerHTML = `
+            <div>
+                <div style="display:flex;">
+                    <h4>${c.name}</h4>
+                    <button>Add Teams</button>
+                </div>
+                
+                
+            </div>
+        `;
+
+        teamClassList.appendChild(div);
+    });
+
 }
 renderClasses();
 

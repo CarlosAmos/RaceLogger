@@ -25,5 +25,10 @@ class Series extends Model
     {
         return $this->hasMany(Season::class);
     }
+
+    public function calendarRaces()
+    {
+        return $this->hasMany(\App\Models\CalendarRace::class, 'series_id');
+    }
 }
 

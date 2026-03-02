@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\World;
 use App\Models\Series;
 use App\Models\Season;
+use App\Models\CalendarRace;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -24,10 +26,20 @@ class DashboardController extends Controller
             ->with('series')
             ->get();
 
+        $upcomingRaces = CalendarRace::with(['season.series','trackLayout.track'])
+            ->where('is_locked', 0)
+            ->whereHas('season', function ($query) use ($currentYear) {
+                $query->where('year', $currentYear);
+            })
+            ->orderBy('race_date', 'asc')
+            ->get();
+
+
         return view('dashboard.index', compact(
             'world',
             'currentYear',
-            'seasons'
+            'seasons',
+            'upcomingRaces'
         ));
     }
 }

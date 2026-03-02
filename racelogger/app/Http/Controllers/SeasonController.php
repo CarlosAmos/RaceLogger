@@ -201,6 +201,7 @@ class SeasonController extends Controller
 
     public function update(Request $request, Season $season)
     {
+
         $validated = $request->validate([
             'series_id' => 'required|exists:series,id',
             'year' => 'required|integer|min:1900|max:2100',
@@ -216,7 +217,9 @@ class SeasonController extends Controller
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
-        ]);
+        ]); 
+        
+        
 
         $raceCodes = collect($request->circuits)
             ->pluck('race_code')
@@ -254,7 +257,9 @@ class SeasonController extends Controller
             $existingClassIds = [];
 
             if ($request->has('classes') && !empty($request->classes)) {
+
                 foreach ($request->classes as $index => $className) {
+
 
                     $seasonClass = $season->classes()
                         ->where('name', $className)

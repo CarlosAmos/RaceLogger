@@ -105,4 +105,10 @@ class CalendarRace extends Model
             'id'                // Local key on race_sessions
         );
     }
+
+    public function trackLayout()
+    {
+        return $this->belongsTo(\App\Models\TrackLayout::class, 'track_layout_id');
+    }
+    
 }
