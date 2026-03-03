@@ -15,6 +15,7 @@
         margin: 4px 0;
         padding: 0 10px;
         font-weight: 600;
+        color: black;
     }
 
     .calender_race.wec {
@@ -27,8 +28,20 @@
     .calender_race.nls {
         border-radius: 20px;
         border: 2px solid #c97900; 
-        background: #c9790094;
-        color: black;
+        background: #c9790094;        
+    }
+
+    .calender_race.igc {
+        border-radius: 20px;
+        border: 2px solid #9000c9; 
+        background: #9000c994;
+    }
+
+    .calender_race.f2 {
+        border-radius: 20px;
+        border: 2px solid #bd5656; 
+        background: #bd56569d;
+        color: white;
     }
 
     .calender_race_divider {
@@ -41,8 +54,16 @@
         color: #0000c98a;
     }
 
-        .calender_race_divider.nls {
+    .calender_race_divider.nls {
         color: #c97900;
+    }
+
+    .calender_race_divider.igc {
+        color: #9000c9;
+    }
+
+    .calender_race_divider.f2 {
+        color: #bd5656;
     }
 </style>
 
@@ -79,7 +100,8 @@
         $raceSeriesDivider = "";
         if($race->season?->series?->short_name == "WEC") { $raceSeries = "wec"; }
         else if($race->season?->series?->short_name == "NLS") { $raceSeries = "nls"; }
-
+        else if($race->season?->series?->short_name == "IGC") { $raceSeries = "igc"; }
+        else if($race->season?->series?->short_name == "F2") { $raceSeries = "f2"; }
         @endphp
         <div class="calender_race {{$raceSeries}}">
             <div style="font-weight:100;width:38px;text-align:center;"><i>{{ $race->season?->series?->short_name }}</i></div>

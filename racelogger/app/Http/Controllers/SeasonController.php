@@ -186,6 +186,17 @@ class SeasonController extends Controller
 
         $pointSystems = PointSystem::with(['rules','bonusRules'])->get();
 
+
+        $season->load([
+            'seasonClasses',
+            'seasonEntries.entrant',
+            'seasonEntries.entryClasses.raceClass',
+            'seasonEntries.entryClasses.entryCars.carModel.engine',
+            'seasonEntries.entryClasses.entryCars.carModel.constructor',
+            'seasonEntries.entryClasses.entryCars.drivers.country',
+            'calendarRaces.results',
+        ]);
+
         return view('seasons.form', [
             'season' => $season,
             'series' => $series,

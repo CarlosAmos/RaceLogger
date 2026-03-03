@@ -58,6 +58,14 @@
     border: 1px solid #ddd;
     margin-top: 15px;
 }
+
+.team_entry {
+    background: #ebebeb;
+    border-radius: 10px;
+    margin:7px 0;
+    padding:5px 15px;
+}
+
 </style>
 
 <div class="page-card">
@@ -82,9 +90,8 @@
         <button type="button" onclick="showTab('basic', this)">Basic Info</button>        
     </div>
 
-    {{-- ===================== --}}
+
     {{-- CIRCUITS TAB --}}
-    {{-- ===================== --}}
     <div id="circuits" class="tab-section">
         <h3>Season Calendar</h3>
         <div id="selected-list"></div>
@@ -107,24 +114,19 @@
         </div>
     </div>
 
-    {{-- ===================== --}}
     {{-- CLASSES TAB --}}
-    {{-- ===================== --}}
     <div id="classes" class="tab-section" style="display:none;">
         <h3>Season Classes</h3>
         <div id="class-list"></div>
         <button type="button" onclick="addClass()" class="small-btn">+ Add Class</button>
 
     </div>
-    {{-- ===================== --}}
     {{-- TEAMS TAB --}}
-    {{-- ===================== --}}
     <div id="teams" class="tab-section" style="display:none;">
         <div id="team-class-list"></div>
     </div>
-    {{-- ===================== --}}
+
     {{-- POINTS TAB --}}
-    {{-- ===================== --}}
     <div id="points" class="tab-section" style="display:none;">
         <h3>Default Points System</h3>
 
@@ -323,9 +325,54 @@ let seasonClasses = [];
 @if(isset($season) && $season->classes && $season->classes->count())
 seasonClasses = [
     @foreach($season->classes as $class)
-        { name: "{{ addslashes($class->name) }}" }@if(!$loop->last),@endif
+        
+
+        { id: "{{$class->id}}", name: "{{ addslashes($class->name) }}" }@if(!$loop->last),@endif
     @endforeach
 ];
+@endif
+
+
+let seasonEntries = [];
+let i = 0;
+
+@if(isset($season) && $season->seasonEntries && $season->seasonEntries->count())
+
+    @foreach($season->seasonEntries as $seasonEntry)
+        
+        @if(!$loop->last)@endif
+
+        @if($seasonEntry->entrant && $seasonEntry->entrant)        
+            @foreach($seasonEntry->entryClasses as $entryClass)
+                if (!seasonEntries[{{$entryClass->raceClass->id}}]) {
+                    seasonEntries[{{$entryClass->raceClass->id}}] = {};
+                }
+
+                @foreach($entryClass->entryCars as $entryCar)
+
+                    if (!seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}] ) {
+                        seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}] = {};
+                    }
+
+                    if (!seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}]["entryCar"] ) {
+                        seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}]["entryCar"] = {};
+                        seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}]["entrantName"] = "{{ $seasonEntry->entrant->name}}";
+                    }
+
+                    console.log("{{$seasonEntry->entrant->name}} - {{$entryClass->raceClass->id}} -> {{$entryCar->id}}");  
+                    seasonEntries[{{$entryClass->raceClass->id}}][{{$entryCar->entry_class_id}}]["entryCar"][{{$entryCar->id}}] = {
+                        entryId: "{{ addslashes($seasonEntry->entrant_id) }}",
+                        entrantName:  "{{ $seasonEntry->entrant->name}}",
+                        carNo: "{{$entryCar->car_number}}",
+                        entryClassId: "{{$entryCar->entry_class_id}}",
+                    };
+                @endforeach   
+
+            @endforeach
+        @endif
+    i++;
+    @endforeach
+    console.log("Entries",seasonEntries);
 @endif
 
 function renderClasses() {
@@ -355,22 +402,49 @@ function renderClasses() {
         inputs.innerHTML += `<input type="hidden" name="classes[${i}]" value="${c.name}">`;
     });
 
+
     seasonClasses.forEach((c,i) => {
 
         const div = document.createElement('div');
         div.className = "class-row";
+        console.log("C",c);
 
-        div.innerHTML = `
+        let teams = ``;
+
+        teams = `
             <div>
                 <div style="display:flex;">
-                    <h4>${c.name}</h4>
+                    <h4>${c.id} ${c.name}</h4>
                     <button>Add Teams</button>
-                </div>
+                </div>`;
                 
+            for (const raceClassId in seasonEntries) {
+                if (raceClassId !== c.id) continue;
+
+                const raceClass = seasonEntries[raceClassId];
+
+                for (const entryClassId in raceClass) {
+
+                    const entryClass = raceClass[entryClassId];
+                    teams += 
+                    `<div class="team_entry">
+                        <h4 style="margin:0;">${entryClass["entrantName"]}</h4>
+                    `;
+                    
+                    for (const entryCar in entryClass["entryCar"]) {
+
+                        const car = entryClass["entryCar"][entryCar];
+                        teams += `<div>#${car.carNo} - ${car.entrantName}</div>`;
+                        
+                    }
+                    teams += `</div>`;
+                }
+            }
+            teams += `   
                 
             </div>
         `;
-
+        div.innerHTML = teams;
         teamClassList.appendChild(div);
     });
 

@@ -29,7 +29,7 @@ class DashboardController extends Controller
         $upcomingRaces = CalendarRace::with(['season.series','trackLayout.track'])
             ->where('is_locked', 0)
             ->whereHas('season', function ($query) use ($currentYear) {
-                $query->where('year', $currentYear);
+                $query->where('year','>=' , $currentYear);
             })
             ->orderBy('race_date', 'asc')
             ->get();
