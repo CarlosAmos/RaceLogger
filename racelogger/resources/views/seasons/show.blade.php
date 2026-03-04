@@ -21,6 +21,45 @@
     border-radius: 0px !important; 
     }
 
+    .champ-table {
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        margin-bottom:10px;
+    }
+
+    .champ-table th,
+    .champ-table td {
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        text-align: center;
+    }
+
+    .champ-leader-col {
+        font-weight: bold;
+        background: #f5f5f5;
+    }
+
+    .champ-autowin {
+        background: #daa80765;
+        font-weight: 600;
+    }
+
+    .champ-win {
+        background: #c8f7c5;
+        font-weight: 600;
+    }
+
+    .champ-next {
+        background: #eee;
+        color: #777;
+    }
+
+    .champ-header {
+        background: #222;
+        color: white;
+        font-weight: 600;
+    }
+
 </style>
 <div class="container">
 
@@ -141,6 +180,92 @@
     <h4 class="mt-5 mb-3 text-uppercase fw-bold border-bottom pb-2">
         {{ $class['name'] }}
     </h4>
+
+
+
+
+    @if(isset($classScenarios[$class['id']]))
+
+    @php
+    $scenario = $classScenarios[$class['id']];
+    @endphp
+
+
+    <h5 style="font-style:italic;">How can #{{$scenario['leader']->entryCar->car_number}} become champion</h5>
+    <table class="champ-table">
+
+    <thead>
+    <tr>
+
+    <th>
+    Leader (#{{ $scenario['leader']->entryCar->car_number }})
+    </th>
+
+    @foreach($scenario['rivals'] as $rival)
+
+    <th>
+    #{{ $rival->entryCar->car_number }} needs to be
+    </th>
+
+    @endforeach
+
+    </tr>
+    </thead>
+
+    <tbody>
+
+    @foreach($scenario['rows'] as $row)
+
+    <tr>
+
+    <td class="champ-leader-col">
+    P{{ $row['leader_pos'] }}
+    </td>
+
+    @if(isset($row['next_race']))
+
+    <td colspan="{{ count($scenario['rivals']) }}">
+    Go to next race
+    </td>
+
+    @else
+
+    @foreach($scenario['rivals'] as $rival)
+
+    <td
+    @if(isset($row['next_race']))
+    class="champ-next"
+    @endif
+    >
+
+    @php
+    $pos = $row['rivals'][$rival->entry_car_id] ?? null;
+    @endphp
+
+    @if($pos)
+        @if($pos > 10)
+            <span class="champ-next">Next Race</span>
+        @else
+             <span class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}</span>
+        @endif
+    @else
+    <span class="champ-autowin">———</span>
+    @endif
+
+    </td>
+
+    @endforeach
+
+    @endif
+
+    </tr>
+
+    @endforeach
+
+    </tbody>
+    </table>
+
+    @endif
 
     <div class="table-responsive">
         <table class="table season-standings text-center align-middle">
