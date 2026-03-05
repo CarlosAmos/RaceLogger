@@ -30,7 +30,7 @@
     .champ-table th,
     .champ-table td {
         border: 1px solid #ddd;
-        padding: 6px 8px;
+        padding: 4px 8px;
         text-align: center;
     }
 
@@ -40,7 +40,7 @@
     }
 
     .champ-autowin {
-        background: #daa80765;
+        background: #edd174;
         font-weight: 600;
     }
 
@@ -177,7 +177,7 @@
     ->values();
     @endphp
 
-    <h4 class="mt-5 mb-3 text-uppercase fw-bold border-bottom pb-2">
+    <h4 class="mt-2 mb-3 text-uppercase fw-bold border-bottom pb-2">
         {{ $class['name'] }}
     </h4>
 
@@ -232,24 +232,46 @@
 
     @foreach($scenario['rivals'] as $rival)
 
-    <td
+    <!-- <td
     @if(isset($row['next_race']))
     class="champ-next"
     @endif
     >
-
+    
     @php
     $pos = $row['rivals'][$rival->entry_car_id] ?? null;
     @endphp
-
+    
     @if($pos)
         @if($pos > 10)
-            <span class="champ-next">Next Race</span>
+            <div class="champ-next">Next Race</div>
         @else
-             <span class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}</span>
+             <div class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}</div>
         @endif
     @else
-    <span class="champ-autowin">———</span>
+    <div class="champ-autowin">———</div>
+    @endif
+
+    </td> -->
+
+    <td
+    @if(isset($row['next_race']))
+    
+    @endif
+    
+    
+    @php
+    $pos = $row['rivals'][$rival->entry_car_id] ?? null;
+    @endphp
+    
+    @if($pos)
+        @if($pos > 10)
+            class="champ-next">Next Race
+        @else
+             class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}
+        @endif
+    @else
+    class="champ-autowin">—
     @endif
 
     </td>

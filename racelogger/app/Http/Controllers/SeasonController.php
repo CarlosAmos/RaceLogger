@@ -141,47 +141,47 @@ class SeasonController extends Controller
         }
     }
 
-public function show(Season $season)
-{
-    $worldId = session('active_world_id');
-    $world = World::findOrFail($worldId);
+    public function show(Season $season)
+    {
+        $worldId = session('active_world_id');
+        $world = World::findOrFail($worldId);
 
-    $tab = request('tab', 'calender');
+        $tab = request('tab', 'calender');
 
-    $season->load([
-        'seasonClasses',
-        'seasonEntries.entrant',
-        'seasonEntries.entryClasses.raceClass',
-        'seasonEntries.entryClasses.entryCars.carModel.engine',
-        'seasonEntries.entryClasses.entryCars.carModel.constructor',
-        'seasonEntries.entryClasses.entryCars.drivers.country',
-        'calendarRaces.results',
-    ]);
-    
-    $scenarioService = new ChampionshipScenarioService();
+        $season->load([
+            'seasonClasses',
+            'seasonEntries.entrant',
+            'seasonEntries.entryClasses.raceClass',
+            'seasonEntries.entryClasses.entryCars.carModel.engine',
+            'seasonEntries.entryClasses.entryCars.carModel.constructor',
+            'seasonEntries.entryClasses.entryCars.drivers.country',
+            'calendarRaces.results',
+        ]);
+        
+        $scenarioService = new ChampionshipScenarioService();
 
-    $classScenarios = [];
+        $classScenarios = [];
 
-    foreach ($season->seasonClasses as $class) {
+        foreach ($season->seasonClasses as $class) {
 
-        $scenario = $scenarioService->getClinchTable(
-            $season->id,
-            $class->id
-        );
+            $scenario = $scenarioService->getClinchTable(
+                $season->id,
+                $class->id
+            );
 
-        if ($scenario) {
-            $classScenarios[$class->id] = $scenario;
+            if ($scenario) {
+                $classScenarios[$class->id] = $scenario;
+            }
         }
-    }
 
-    
-    return view('seasons.show', compact(
-        'world',
-        'season',
-        'tab',
-        'classScenarios'
-    ));
-}
+        
+        return view('seasons.show', compact(
+            'world',
+            'season',
+            'tab',
+            'classScenarios'
+        ));
+    }
 
     public function edit(World $world, Season $season)
     {

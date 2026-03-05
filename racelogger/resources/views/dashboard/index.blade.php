@@ -43,6 +43,12 @@
         background: #bd56569d;
         color: white;
     }
+    .calender_race.f1 {
+        border-radius: 20px;
+        border: 2px solid #ff0000; 
+        background: #ff000075;
+        color: white;
+    }
 
     .calender_race_divider {
         width: 15px;
@@ -64,6 +70,9 @@
 
     .calender_race_divider.f2 {
         color: #bd5656;
+    }
+    .calender_race_divider.f1 {
+        color: #ff0000; 
     }
 </style>
 
@@ -98,7 +107,8 @@
         @php
         $raceSeries = "";
         $raceSeriesDivider = "";
-        if($race->season?->series?->short_name == "WEC") { $raceSeries = "wec"; }
+        if($race->season?->series?->short_name == "F1") { $raceSeries = "f1"; }
+        else if($race->season?->series?->short_name == "WEC") { $raceSeries = "wec"; }
         else if($race->season?->series?->short_name == "NLS") { $raceSeries = "nls"; }
         else if($race->season?->series?->short_name == "IGC") { $raceSeries = "igc"; }
         else if($race->season?->series?->short_name == "F2") { $raceSeries = "f2"; }
