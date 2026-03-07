@@ -66,7 +66,54 @@
     padding:5px 15px;
 }
 
+.entry-car {
+    border: 2px solid white;
+    padding: 4px;
+    margin:4px;
+    border-radius: 20px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 1) !important;
+    width:185px;
+}
+
+.entry-car-no {
+    border-radius: 80px;
+    color: black;
+    font-size: 50px;
+    padding: 13px 13px;
+    text-align: center;
+    width: 100px;
+    height: 100px;
+}
+
+.entry-driver-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.entry-driver {
+    padding: 2px 8px;
+    background: #ffffff;
+    margin: 2px 0;
+    border-radius: 20px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05) !important;
+    text-align: center;
+    font-size: 14px;
+}
+
+.entry-class {
+    font-size:1rem; 
+    text-align:center; 
+    font-style:italic; 
+    margin-bottom: -5px;
+    padding: 2px 8px;
+    color:white;
+    border-radius: 20px;
+    margin-bottom:4px;
+}
+
 </style>
+
 
 <div class="page-card">
 
@@ -121,9 +168,17 @@
         <button type="button" onclick="addClass()" class="small-btn">+ Add Class</button>
 
     </div>
+
     {{-- TEAMS TAB --}}
     <div id="teams" class="tab-section" style="display:none;">
         <div id="team-class-list"></div>
+
+        <?php
+        print("<pre>");
+        print_r($season->seasonEntries[0]);
+        print("</pre>");
+        ?>
+
     </div>
 
     {{-- POINTS TAB --}}
@@ -366,8 +421,7 @@ let i = 0;
                         carNo: "{{$entryCar->car_number}}",
                         entryClassId: "{{$entryCar->entry_class_id}}",
                     };
-                @endforeach   
-
+                @endforeach  
             @endforeach
         @endif
     i++;
@@ -403,51 +457,83 @@ function renderClasses() {
     });
 
 
-    seasonClasses.forEach((c,i) => {
 
-        const div = document.createElement('div');
-        div.className = "class-row";
-        console.log("C",c);
-
-        let teams = ``;
-
-        teams = `
-            <div>
-                <div style="display:flex;">
-                    <h4>${c.id} ${c.name}</h4>
-                    <button>Add Teams</button>
-                </div>`;
-                
-            for (const raceClassId in seasonEntries) {
-                if (raceClassId !== c.id) continue;
-
-                const raceClass = seasonEntries[raceClassId];
-
-                for (const entryClassId in raceClass) {
-
-                    const entryClass = raceClass[entryClassId];
-                    teams += 
-                    `<div class="team_entry">
-                        <h4 style="margin:0;">${entryClass["entrantName"]}</h4>
-                    `;
-                    
-                    for (const entryCar in entryClass["entryCar"]) {
-
-                        const car = entryClass["entryCar"][entryCar];
-                        teams += `<div>#${car.carNo} - ${car.entrantName}</div>`;
-                        
-                    }
-                    teams += `</div>`;
-                }
-            }
-            teams += `   
-                
+    const teamDiv = document.createElement('div'); 
+    teamDiv.className = "class-row";
+    let teams = `
+    <div class="row">
+        @foreach($season->seasonEntries as $entry)
+        <div class="shadow-sm mb-3" style="border-radius:10px;">
+            <div class="d-flex justify-content-between" style="border-bottom:2px solid #d3d3d3;">
+                <div class="d-flex">
+                    <h5 class="mb-1" style="font-weight:600; padding: 2px 10px;">{{$entry->display_name ?? $entry->entrant->name}}</h5>
+                    @if($entry->display_name)
+                        <small class="text-muted" style="font-style:italic;">
+                            {{ $entry->entrant->name }}
+                        </small>
+                    @endif
+                    <div>
+                        <div style="color: green; border-radius: 20px; padding: 0 7px; border: 1px solid green; user-select:none; cursor:pointer; ">+</div>                                           
+                    </div>
+                </div>
+                <div>
+                    <h5 class="shadow-sm mb-1" style="font-weight:100; padding:2px 10px; margin-top:1px; border-radius: 20px;"> {{ $entry->constructor->name }}</h5>
+                </div>
             </div>
-        `;
-        div.innerHTML = teams;
-        teamClassList.appendChild(div);
-    });
+            <div class="mt-2 d-flex flex-row">
+                @forelse($entry->entryClasses as $class)
+                    @forelse($class->entryCars as $entryCar)
+                        @php    
+                        $raceNumberColour = "black";
+                        $entryBorder = " box-shadow: 0 0 0.25rem rgba(0, 0, 0, 1) !important;";
+                        if(strtolower($class->raceClass->name) === "hypercar") {
+                            $raceNumberColour = "red";
+                            $entryBorder = " box-shadow: 0 0 0.25rem red !important;";
+                        }
+                        else if(strtolower($class->raceClass->name) === "lmgte am") {
+                            $raceNumberColour = "#ff9b00";
+                            $entryBorder = " box-shadow: 0 0 0.25rem #ff9b00 !important;";
+                        }
+                        else if(strtolower($class->raceClass->name) === "lmp2") {
+                            $raceNumberColour = "blue";
+                            $entryBorder = " box-shadow: 0 0 0.25rem blue !important;";
+                        }
+                        @endphp
 
+                        <div class="entry-car me-3" style="display: flex; flex-direction: column; align-items: center; {{$entryBorder}}">
+                            <h5 class="entry-class" style="background:{{$raceNumberColour}};">{{ $class->raceClass->name }}</h5>
+                            <strong style="margin-bottom: -5px; text-align:center; text-wrap:auto;">{{$entryCar->carModel->name}}</strong>
+                            <div style="font-style:italic; margin-bottom: 4px;">{{$entryCar->carModel->year}}</div>
+                            <div class="entry-car-no" style="">{{$entryCar->car_number}}</div>
+                            <div class="entry-driver-list mt-2">
+                                @forelse($entryCar->drivers as $driver)
+                                    <div class="entry-driver">{{$driver->first_name}} {{$driver->last_name}}</div>
+                                    @empty
+                                    <span class="text-muted small">
+                                        No Drivers
+                                    </span>
+                                @endforelse
+                            </div>
+                        </div>
+                    @empty
+                    <span class="text-muted small">
+                        No Cars
+                    </span>
+                @endforelse
+
+                @empty
+                <span class="text-muted small">
+                    No classes
+                </span>
+                @endforelse
+            </div>
+        </div>            
+        @endforeach 
+    </div>
+    `;
+
+    teamDiv.innerHTML = teams;
+    teamClassList.appendChild(teamDiv);
 }
 renderClasses();
 

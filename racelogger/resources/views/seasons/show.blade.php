@@ -9,7 +9,7 @@
     }
 
     .mini-badge {
-        margin-left:0 !important;
+        margin-left: 0 !important;
     }
 
     .cell_style {
@@ -18,13 +18,13 @@
     }
 
     .result-cell {
-    border-radius: 0px !important; 
+        border-radius: 0px !important;
     }
 
     .champ-table {
         border-collapse: collapse;
         font-size: 0.9rem;
-        margin-bottom:10px;
+        margin-bottom: 10px;
     }
 
     .champ-table th,
@@ -59,7 +59,6 @@
         color: white;
         font-weight: 600;
     }
-
 </style>
 <div class="container">
 
@@ -166,6 +165,101 @@
     ->values();
     @endphp
 
+    <div style="display:flex;justify-content: center;">
+        @if(count($classTables) > 0)
+            <h4 class="fw-bold">Potential Champion{{count($classTables) > 1 ? "s" : ""}}</h4>
+        @endif
+    </div>
+    <div style="display:flex;justify-content: space-evenly;">
+        @foreach($classTables as $class)
+            @if(isset($classScenarios[$class['id']]))
+            <div style="display:flex; align-items:center; flex-direction:column;">                
+                <h4 class="mt-2 mb-3 text-uppercase border-bottom pb-2">
+                    {{ $class['name'] }}
+                </h4>
+                
+                @php
+                $scenario = $classScenarios[$class['id']];
+                @endphp
+
+
+                <h5 style="font-style:italic;">How can #{{$scenario['leader']->entryCar->car_number}} become champion</h5>
+                <table class="champ-table">
+
+                    <thead>
+                        <tr>
+
+                            <th>
+                                Leader (#{{ $scenario['leader']->entryCar->car_number }})
+                            </th>
+
+                            @foreach($scenario['rivals'] as $rival)
+
+                            <th>
+                                #{{ $rival->entryCar->car_number }} needs to be
+                            </th>
+
+                            @endforeach
+
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach($scenario['rows'] as $row)
+
+                        <tr>
+
+                            <td class="champ-leader-col">
+                                P{{ $row['leader_pos'] }}
+                            </td>
+
+                            @if(isset($row['next_race']))
+
+                            <td colspan="{{ count($scenario['rivals']) }}">
+                                Go to next race
+                            </td>
+
+                            @else
+
+                            @foreach($scenario['rivals'] as $rival)
+
+                            <td
+                                @if(isset($row['next_race']))
+
+                                @endif
+
+
+                                @php
+                                $pos=$row['rivals'][$rival->entry_car_id] ?? null;
+                                @endphp
+
+                                @if($pos)
+                                @if($pos > 10)
+                                class="champ-next">Next Race
+                                @else
+                                class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}
+                                @endif
+                                @else
+                                class="champ-autowin">—
+                                @endif
+
+                            </td>
+
+                            @endforeach
+
+                            @endif
+
+                        </tr>
+
+                        @endforeach
+
+                    </tbody>
+                </table>
+            </div>
+            @endif
+        @endforeach
+    </div>
 
     @foreach($classTables as $class)
 
@@ -182,110 +276,8 @@
     </h4>
 
 
-
-
     @if(isset($classScenarios[$class['id']]))
 
-    @php
-    $scenario = $classScenarios[$class['id']];
-    @endphp
-
-
-    <h5 style="font-style:italic;">How can #{{$scenario['leader']->entryCar->car_number}} become champion</h5>
-    <table class="champ-table">
-
-    <thead>
-    <tr>
-
-    <th>
-    Leader (#{{ $scenario['leader']->entryCar->car_number }})
-    </th>
-
-    @foreach($scenario['rivals'] as $rival)
-
-    <th>
-    #{{ $rival->entryCar->car_number }} needs to be
-    </th>
-
-    @endforeach
-
-    </tr>
-    </thead>
-
-    <tbody>
-
-    @foreach($scenario['rows'] as $row)
-
-    <tr>
-
-    <td class="champ-leader-col">
-    P{{ $row['leader_pos'] }}
-    </td>
-
-    @if(isset($row['next_race']))
-
-    <td colspan="{{ count($scenario['rivals']) }}">
-    Go to next race
-    </td>
-
-    @else
-
-    @foreach($scenario['rivals'] as $rival)
-
-    <!-- <td
-    @if(isset($row['next_race']))
-    class="champ-next"
-    @endif
-    >
-    
-    @php
-    $pos = $row['rivals'][$rival->entry_car_id] ?? null;
-    @endphp
-    
-    @if($pos)
-        @if($pos > 10)
-            <div class="champ-next">Next Race</div>
-        @else
-             <div class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}</div>
-        @endif
-    @else
-    <div class="champ-autowin">———</div>
-    @endif
-
-    </td> -->
-
-    <td
-    @if(isset($row['next_race']))
-    
-    @endif
-    
-    
-    @php
-    $pos = $row['rivals'][$rival->entry_car_id] ?? null;
-    @endphp
-    
-    @if($pos)
-        @if($pos > 10)
-            class="champ-next">Next Race
-        @else
-             class="champ-win">{{ $pos }}{{ ['st','nd','rd','th'][$pos-1] ?? 'th' }} {{ ($pos > 1 ? "or lower" : "") }}
-        @endif
-    @else
-    class="champ-autowin">—
-    @endif
-
-    </td>
-
-    @endforeach
-
-    @endif
-
-    </tr>
-
-    @endforeach
-
-    </tbody>
-    </table>
 
     @endif
 
@@ -347,32 +339,32 @@
                     if ($result) {
 
                     if (is_numeric($result->class_position) && $result->status === "finished") {
-                        if ($result->class_position == 1) {
-                            $cellClass = 'bg-warning text-dark';
-                        } elseif ($result->class_position == 2) {
-                            $cellClass = 'bg-secondary text-white';
-                        } elseif ($result->class_position == 3) {
-                            $cellClass = 'bg-bronze text-white';
-                        } elseif ($result->points_awarded > 0) {
-                            $cellClass = 'bg-success text-white';
-                        }
+                    if ($result->class_position == 1) {
+                    $cellClass = 'bg-warning text-dark';
+                    } elseif ($result->class_position == 2) {
+                    $cellClass = 'bg-secondary text-white';
+                    } elseif ($result->class_position == 3) {
+                    $cellClass = 'bg-bronze text-white';
+                    } elseif ($result->points_awarded > 0) {
+                    $cellClass = 'bg-success text-white';
+                    }
                     } else {
-                        switch (strtoupper($result->status)) {
-                            case 'DSQ':
-                            $cellClass = 'bg-dark text-white';
-                            break;
-                            case 'RET':
-                            case 'DNF':
-                            $cellClass = 'dnf_details text-white';
-                            break;
-                            case 'DNS':
-                            $cellClass = 'bg-white text-dark';
-                            break;
-                            case 'DNQ':
-                            case 'DNPQ':
-                            $cellClass = 'bg-danger text-white';
-                            break;
-                        }
+                    switch (strtoupper($result->status)) {
+                    case 'DSQ':
+                    $cellClass = 'bg-dark text-white';
+                    break;
+                    case 'RET':
+                    case 'DNF':
+                    $cellClass = 'dnf_details text-white';
+                    break;
+                    case 'DNS':
+                    $cellClass = 'bg-white text-dark';
+                    break;
+                    case 'DNQ':
+                    case 'DNPQ':
+                    $cellClass = 'bg-danger text-white';
+                    break;
+                    }
                     }
 
                     /*
@@ -411,9 +403,9 @@
 
                     <td class="{{ $cellClass }} result-cell cell_style">
                         @if($result)
-                            @if($result->status == "finished") {{ $result->class_position }}
-                            @else {{ strtoupper($result->status) }}
-                            @endif
+                        @if($result->status == "finished") {{ $result->class_position }}
+                        @else {{ strtoupper($result->status) }}
+                        @endif
                         @if($pBadge)
                         <span class="mini-badge badge-p">P</span>
                         @endif
@@ -422,7 +414,7 @@
                         <span class="mini-badge badge-fl">FL</span>
                         @endif
                         @else
-                        
+
                         @endif
                     </td>
 
@@ -526,19 +518,19 @@
     {{-- ========================= --}}
     @foreach($classTables as $class)
     @php
-    $currentClassId = $class['id'];                    
+    $currentClassId = $class['id'];
     $className = $class['name'];
     switch($className){
-        case "Hypercar":
-        $className = "Hypercar World Endurance Manufacturer's Championship";
-         $teamScoringMode = 'best_car';
-        break;
-        case "LMP2":
-        case "LMGTE Am":
-        case "GT3":
-            $className = "FIA Endurance Trophy for ".$className." Teams";
-            $teamScoringMode = 'per_car';
-        break;
+    case "Hypercar":
+    $className = "Hypercar World Endurance Manufacturer's Championship";
+    $teamScoringMode = 'best_car';
+    break;
+    case "LMP2":
+    case "LMGTE Am":
+    case "GT3":
+    $className = "FIA Endurance Trophy for ".$className." Teams";
+    $teamScoringMode = 'per_car';
+    break;
     }
 
 
@@ -546,28 +538,28 @@
 
     foreach ($races as $race) {
 
-        $classResults = $race->results->filter(function ($result) use ($race, $currentClassId) {
+    $classResults = $race->results->filter(function ($result) use ($race, $currentClassId) {
 
-        $entryCar = $race->entryCars
-        ->firstWhere('id', $result->entry_car_id);
+    $entryCar = $race->entryCars
+    ->firstWhere('id', $result->entry_car_id);
 
-        return $entryCar
-        && $entryCar->entryClass->race_class_id == $currentClassId;
+    return $entryCar
+    && $entryCar->entryClass->race_class_id == $currentClassId;
     });
 
     if ($teamScoringMode === 'best_car') {
-        /*
-        |--------------------------------------------------------------------------
-        | Hypercar Style (Best Car Only Per Team)
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | Hypercar Style (Best Car Only Per Team)
+    |--------------------------------------------------------------------------
+    */
 
-        $groupedByTeam = $classResults->groupBy(function ($result) use ($race) {
+    $groupedByTeam = $classResults->groupBy(function ($result) use ($race) {
 
-        $entryCar = $race->entryCars
-        ->firstWhere('id', $result->entry_car_id);
+    $entryCar = $race->entryCars
+    ->firstWhere('id', $result->entry_car_id);
 
-        return optional($entryCar->entryClass->seasonEntry->entrant)->id;
+    return optional($entryCar->entryClass->seasonEntry->entrant)->id;
     });
 
     foreach ($groupedByTeam as $teamId => $results) {
@@ -587,15 +579,15 @@
     $constructor = $seasonEntry->constructor;
 
     $displayLabel = ($className === 'Hypercar'
-        ? optional($constructor)->name
-        : optional($entrant)->name);
+    ? optional($constructor)->name
+    : optional($entrant)->name);
 
     if (!isset($teamRows[$teamId])) {
-        $teamRows[$teamId] = [
-            'label' => $displayLabel,
-            'raceResults' => [],
-            'totalPoints' => 0
-        ];
+    $teamRows[$teamId] = [
+    'label' => $displayLabel,
+    'raceResults' => [],
+    'totalPoints' => 0
+    ];
     }
 
     $teamRows[$teamId]['raceResults'][$race->id] = $bestResult;

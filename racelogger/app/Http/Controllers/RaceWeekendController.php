@@ -186,7 +186,7 @@ class RaceWeekendController extends Controller
 
             // Optional: mark race as completed/locked
             $race->update([
-                'is_completed' => true
+                'is_locked' => true
             ]);
 
             return redirect()
