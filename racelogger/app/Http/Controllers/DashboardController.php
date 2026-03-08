@@ -19,11 +19,11 @@ class DashboardController extends Controller
         $currentYear = $world->current_year;
 
         // Get seasons for current year with their series
-        $seasons = Season::where('year', $currentYear)
-            ->whereHas('series', function ($query) use ($worldId) {
+        $seasons = Season::whereHas('series', function ($query) use ($worldId) {
                 $query->where('world_id', $worldId);
             })
             ->with('series')
+            ->orderBy('year', 'asc')
             ->get();
 
         $upcomingRaces = CalendarRace::with(['season.series','trackLayout.track'])

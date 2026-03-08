@@ -173,7 +173,6 @@ class SeasonController extends Controller
                 $classScenarios[$class->id] = $scenario;
             }
         }
-
         
         return view('seasons.show', compact(
             'world',
@@ -187,6 +186,8 @@ class SeasonController extends Controller
     {
         $worldId = session('active_world_id');
         $world = World::findOrFail($worldId);
+
+        $tab = request('tab', 'teams');
 
         abort_unless($season->series->world_id == $worldId, 403);
 
@@ -225,7 +226,8 @@ class SeasonController extends Controller
             'calendarRaces' => $calendarRaces,
             'mode' => 'edit',
             'worlds' => $world,
-            'pointSystems' => $pointSystems
+            'pointSystems' => $pointSystems,
+            'tab' => $tab
         ]);
     }
 

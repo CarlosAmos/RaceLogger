@@ -107,6 +107,18 @@ Route::resource(
     EntryCarController::class
 );
 
+Route::prefix('worlds/{world}/seasons/{season}/season-entries/{seasonEntry}')
+->group(function () {
+
+    // static routes first
+    Route::get('entry_create', [EntryCarController::class, 'create_entry'])
+        ->name('entry-cars.create_entry');
+
+    Route::post('entry_create', [EntryCarController::class, 'store_entry'])
+        ->name('entry-cars.store');
+
+});
+
 Route::resource('worlds.drivers', WorldDriverController::class);
 
 Route::prefix('worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes/{entryClass}/entry-cars/{entryCar}')
@@ -127,5 +139,4 @@ Route::get('/races/{race}', [RaceWeekendController::class, 'show'])
 Route::post(
     '/races/{race}/weekend',
     [RaceWeekendController::class, 'update']
-)
-    ->name('races.weekend.update');
+)->name('races.weekend.update');

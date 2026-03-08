@@ -139,7 +139,7 @@
 
 
     {{-- CIRCUITS TAB --}}
-    <div id="circuits" class="tab-section">
+    <div id="circuits" class="tab-section" style="display:none;">
         <h3>Season Calendar</h3>
         <div id="selected-list"></div>
         <hr>
@@ -170,15 +170,9 @@
     </div>
 
     {{-- TEAMS TAB --}}
-    <div id="teams" class="tab-section" style="display:none;">
+    <div id="teams" class="tab-section" style="{{ $tab === 'teams' ? '' : 'display:none;' }}">
+        <a href="{{ route('worlds.seasons.season-entries.create', [$worlds, $season]) }}">Add Team</a>
         <div id="team-class-list"></div>
-
-        <?php
-        print("<pre>");
-        print_r($season->seasonEntries[0]);
-        print("</pre>");
-        ?>
-
     </div>
 
     {{-- POINTS TAB --}}
@@ -255,7 +249,7 @@ function showTab(tabId, btn) {
 
     if (btn) btn.classList.add('active');
 }
-showTab('circuits', document.querySelector('.tab-nav button'));
+showTab('{{$tab}}', document.querySelector('.tab-nav button'));
 
 const pointSystems = @json($pointSystems);
 
@@ -369,6 +363,7 @@ function renderCircuits() {
         `;
     });
 }
+
 renderCircuits();
 
 /* ======================
@@ -473,7 +468,9 @@ function renderClasses() {
                         </small>
                     @endif
                     <div>
-                        <div style="color: green; border-radius: 20px; padding: 0 7px; border: 1px solid green; user-select:none; cursor:pointer; ">+</div>                                           
+                        <div style="color: green; border-radius: 20px; padding: 0 7px; border: 1px solid green; user-select:none; cursor:pointer; margin-left:10px;">
+                        <a style="text-decoration: none; color: green;" href="{{ route('entry-cars.create_entry', [$worlds, $season, $entry]) }}">+</a>
+                        </div>                                           
                     </div>
                 </div>
                 <div>
@@ -490,7 +487,7 @@ function renderClasses() {
                             $raceNumberColour = "red";
                             $entryBorder = " box-shadow: 0 0 0.25rem red !important;";
                         }
-                        else if(strtolower($class->raceClass->name) === "lmgte am") {
+                        else if(strtolower($class->raceClass->name) === "lmgte am" || strtolower($class->raceClass->name) === "lmgt3") {
                             $raceNumberColour = "#ff9b00";
                             $entryBorder = " box-shadow: 0 0 0.25rem #ff9b00 !important;";
                         }
@@ -506,6 +503,9 @@ function renderClasses() {
                             <div style="font-style:italic; margin-bottom: 4px;">{{$entryCar->carModel->year}}</div>
                             <div class="entry-car-no" style="">{{$entryCar->car_number}}</div>
                             <div class="entry-driver-list mt-2">
+                                <div>Drivers 
+                                    <a  href="{{ route('entry-cars.drivers.edit', [$worlds, $season, $seasonEntry, $entryClass, $entryCar]) }}"><i class="fa-solid fa-pen-to-square" style="cursor:pointer;"></i></a>                                    
+                                </div>
                                 @forelse($entryCar->drivers as $driver)
                                     <div class="entry-driver">{{$driver->first_name}} {{$driver->last_name}}</div>
                                     @empty
@@ -523,7 +523,7 @@ function renderClasses() {
 
                 @empty
                 <span class="text-muted small">
-                    No classes
+                    No Cars
                 </span>
                 @endforelse
             </div>

@@ -48,14 +48,60 @@
 
             @php
             $isAssignedToThisCar = in_array($driver->id, $assignedDrivers);
-            $isAssignedToOtherCar = in_array($driver->id, $otherCarDriverIds);
+            $isAssignedToOtherCar = in_array($driver->id, $otherCarDriverIds);   
+            
+            if($isAssignedToOtherCar) continue;
             @endphp
 
             <div class="col-md-3 mb-3">
 
                 <label class="card h-100 p-2
-            {{ $isAssignedToThisCar ? 'border-success' : '' }}
-            {{ $isAssignedToOtherCar && !$isAssignedToThisCar ? 'bg-light text-muted border-secondary' : '' }}"
+                {{ $isAssignedToThisCar ? 'border-success' : '' }}
+                {{ $isAssignedToOtherCar && !$isAssignedToThisCar ? 'bg-light text-muted border-secondary' : '' }}"
+                    style="cursor:pointer;">
+
+                    <div class="form-check">
+
+                        <input type="checkbox"
+                            name="drivers[]"
+                            value="{{ $driver->id }}"
+                            class="form-check-input"
+                            {{ $isAssignedToThisCar ? 'checked' : '' }}
+                            {{ $isAssignedToOtherCar && !$isAssignedToThisCar ? 'disabled' : '' }}>
+
+                        <span class="form-check-label fw-bold">
+                            {{ $driver->full_name }}
+                        </span>
+
+                    </div>
+
+                    <small>
+                        {{ $driver->country->name ?? '' }}
+                    </small>
+
+                </label>
+
+            </div>
+
+            @endforeach
+        </div>
+
+        <h5 class="mb-3">Unavailable Drivers</h5>
+        <div class="row">
+            @foreach($drivers as $driver)
+
+            @php
+            $isAssignedToThisCar = in_array($driver->id, $assignedDrivers);
+            $isAssignedToOtherCar = in_array($driver->id, $otherCarDriverIds);   
+            
+            if($isAssignedToThisCar || !$isAssignedToOtherCar) continue;
+            @endphp
+
+            <div class="col-md-3 mb-3">
+
+                <label class="card h-100 p-2
+                {{ $isAssignedToThisCar ? 'border-success' : '' }}
+                {{ $isAssignedToOtherCar && !$isAssignedToThisCar ? 'bg-light text-muted border-secondary' : '' }}"
                     style="cursor:pointer;">
 
                     <div class="form-check">

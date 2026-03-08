@@ -92,12 +92,6 @@
                 Teams
             </a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link {{ $tab === 'details' ? 'active' : '' }}"
-                href="{{ route('seasons.show', [$season, 'tab' => 'details']) }}">
-                Details
-            </a>
-        </li>
     </ul>
     @if($tab === 'calender')
 
@@ -531,6 +525,9 @@
     $className = "FIA Endurance Trophy for ".$className." Teams";
     $teamScoringMode = 'per_car';
     break;
+    default:
+        $teamScoringMode = 'per_car';
+        break;
     }
 
 
@@ -556,10 +553,10 @@
 
     $groupedByTeam = $classResults->groupBy(function ($result) use ($race) {
 
-    $entryCar = $race->entryCars
-    ->firstWhere('id', $result->entry_car_id);
+        $entryCar = $race->entryCars
+        ->firstWhere('id', $result->entry_car_id);
 
-    return optional($entryCar->entryClass->seasonEntry->entrant)->id;
+        return optional($entryCar->entryClass->seasonEntry->entrant)->id;
     });
 
     foreach ($groupedByTeam as $teamId => $results) {

@@ -74,8 +74,8 @@ class EntryCarDriverController extends Controller
 
         return redirect()
             ->route(
-                'worlds.seasons.season-entries.entry-classes.entry-cars.index',
-                [$world, $season, $seasonEntry, $entryClass]
+                'worlds.seasons.edit',
+                [$world, $season]
             )
             ->with('success', 'Drivers updated successfully.');
     }

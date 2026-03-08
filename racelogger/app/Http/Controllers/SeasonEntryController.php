@@ -58,9 +58,14 @@ class SeasonEntryController extends Controller
             'series_id'      => $season->series_id, // 👈 important
         ]);
 
+
+
         return redirect()
-            ->route('seasons.show', [$season])
+            ->route('worlds.seasons.edit', [$world, $season])
             ->with('success', 'Team added to season.');
+        // return redirect()
+        //     ->route('seasons.show', [$season])
+        //     ->with('success', 'Team added to season.');
     }
 
     /**
