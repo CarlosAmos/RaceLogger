@@ -6,6 +6,8 @@
     .container {
         margin-right: 0 !important;
         margin-left: 0 !important;
+        width:100%;
+        max-width: 100% !important;
     }
 
     .calender_race {
@@ -132,6 +134,9 @@
 
     </div>
     <div style="display: flex; gap: 5px; flex-wrap: wrap; flex-direction: column;margin-left:10px;">
+        <div style="display:flex; width:100%">
+        @include('dashboard.partial.season', ['results' => $results])
+        </div>
         <div style="display: flex;">
             <h3 style="margin:0;">Active Series</h3>
             <div class="dashboard-actions">

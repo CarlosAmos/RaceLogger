@@ -20,6 +20,11 @@ class QualifyingSession extends Model
     |--------------------------------------------------------------------------
     */
 
+    public function qualifyingResults()
+    {
+        return $this->hasMany(QualifyingResult::class);
+    }
+
     public function calendarRace()
     {
         return $this->belongsTo(CalendarRace::class);
