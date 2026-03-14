@@ -14,6 +14,7 @@ class CalendarRace extends Model
         'race_code',
         'race_date',
         'point_system_id',
+        'sprint_race'
     ];
 
     public function season()

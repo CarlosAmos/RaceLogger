@@ -173,10 +173,14 @@ class SeasonController extends Controller
                 $classScenarios[$class->id] = $scenario;
             }
         }
-        
+
+        $series = Series::where('id', $season->series_id)->get();
+
+        //dd($series[0]);
         return view('seasons.show', compact(
             'world',
             'season',
+            'series',
             'tab',
             'classScenarios'
         ));
@@ -215,6 +219,7 @@ class SeasonController extends Controller
             'seasonEntries.entryClasses.entryCars.carModel.constructor',
             'seasonEntries.entryClasses.entryCars.drivers.country',
             'calendarRaces.results',
+            'calendarRaces.layout.track.country'
         ]);
 
         return view('seasons.form', [
@@ -245,14 +250,13 @@ class SeasonController extends Controller
             'circuits.*.gp_name' => 'required|string|max:255',
             'circuits.*.race_code' => ['required','string','size:3','alpha'],
             'circuits.*.race_date' => 'required|date',
+            'circuits.*.sprint_race' => 'required|integer|min:0|max:1',
             'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
         ]); 
         
-        
-
         $raceCodes = collect($request->circuits)
             ->pluck('race_code')
             ->map(fn($code) => strtoupper($code));
@@ -331,13 +335,14 @@ class SeasonController extends Controller
             // Recreate calendar (WITH race override point system)
             foreach ($request->circuits as $index => $race) {
 
-                CalendarRace::create([
+                CalendarRace::firstOrCreate([
                     'season_id' => $season->id,
                     'track_layout_id' => $race['layout_id'],
                     'round_number' => $index + 1,
                     'gp_name' => $race['gp_name'],
                     'race_code' => strtoupper($race['race_code']),
                     'race_date' => $race['race_date'],
+                    'sprint_race' => $race['sprint_race'],
                     'point_system_id' => $race['point_system_id'] ?? null,
                 ]);
             }

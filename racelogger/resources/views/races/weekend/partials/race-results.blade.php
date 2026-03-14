@@ -3,7 +3,8 @@
         ->with([
             'entryClass.raceClass',
             'entryClass.seasonEntry.entrant',
-            'carModel'
+            'carModel',
+            'drivers'
         ])
         ->get();
 

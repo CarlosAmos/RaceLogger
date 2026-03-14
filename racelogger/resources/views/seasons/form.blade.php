@@ -41,8 +41,9 @@
     border: 1px solid #ddd;
     padding: 15px;
     margin-bottom: 12px;
-    border-radius: 6px;
+    border-radius: 40px;
     background: white;
+    box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 13%) !important;
 }
 
 .small-btn {
@@ -286,6 +287,10 @@ document.getElementById('seasonPointSystem')
 let selectedCircuits = [];
 
 @if(isset($calendarRaces) && $calendarRaces->count())
+
+    @php
+     
+    @endphp
 selectedCircuits = [
     @foreach($calendarRaces as $race)
     {
@@ -293,12 +298,14 @@ selectedCircuits = [
         trackName: "{{ addslashes($race->layout->track->name) }}",
         layoutName: "{{ addslashes($race->layout->name) }}",
         city: "{{ addslashes($race->layout->track->city ?? '') }}",
-        country: "{{ addslashes(optional($race->layout->track->country)->name ?? '') }}",
+        country: "{{ $race->layout->track->country->name ?? '' }}",
         gpName: "{{ addslashes($race->gp_name) }}",
         raceCode: "{{ $race->race_code }}",
         raceDate: "{{ $race->race_date }}",
+        sprintRace: "{{ $race->sprint_race }}",
         pointSystemId: "{{ $race->point_system_id ?? '' }}"
     }@if(!$loop->last),@endif
+ 
     @endforeach
 ];
 @endif
@@ -310,46 +317,66 @@ function renderCircuits() {
     inputs.innerHTML = '';
 
     selectedCircuits.forEach((c,i) => {
-
         const div = document.createElement('div');
         div.className = "circuit-card";
+        
+        const layoutName = c.layoutName.replace("Grand Prix","GP");
+        
 
         div.innerHTML = `
-            <strong>Round ${i+1}</strong><br><br>
+        <div style="display:flex; justify-content: space-between;margin:0 20px;">
+            <div style="display:flex;">
+                <strong style="font-size:20px;">R${i+1} </strong>
+                <div style="margin: 0 6px;"></div>
 
-            <input type="text" value="${c.gpName}"
-                placeholder="Grand Prix Name"
-                oninput="selectedCircuits[${i}].gpName=this.value; renderCircuits();">
+                <input type="text" value="${c.gpName}" style="font-size: 18px;  border-radius: 15px; border: 1px solid #dddddd; padding: 0 15px; width: 400px; font-weight: 400;"
+                    placeholder="Grand Prix Name"
+                    onchange="selectedCircuits[${i}].gpName=this.value; renderCircuits();">
 
-            <input type="text" maxlength="3"
-                value="${c.raceCode}"
-                placeholder="CODE"
-                oninput="selectedCircuits[${i}].raceCode=this.value.toUpperCase(); renderCircuits();">
+                <input type="text" maxlength="3" style="width: 70px; text-align: center; font-style: italic; margin-left:10px;  border-radius: 15px; border: 1px solid #dddddd; padding: 0 4px; font-weight: 600;"
+                    value="${c.raceCode}"
+                    placeholder="CODE"
+                    onchange="selectedCircuits[${i}].raceCode=this.value.toUpperCase(); renderCircuits();">
 
-            <input type="date"
-                value="${c.raceDate || ''}"
-                onchange="selectedCircuits[${i}].raceDate=this.value; renderCircuits();">
-
-            <br><br>
-
-            ${c.trackName} (${c.layoutName}) - ${c.city}, ${c.country}
-
-            <br><br>
-
-            <label>Override Points</label>
-            <select onchange="selectedCircuits[${i}].pointSystemId=this.value; renderCircuits();">
-                <option value="">Season Default</option>
-                ${pointSystems.map(ps =>
-                    `<option value="${ps.id}"
-                     ${c.pointSystemId == ps.id ? 'selected' : ''}>
-                     ${ps.name}
-                     </option>`
-                ).join('')}
-            </select>
-
-            <button type="button"
-                onclick="selectedCircuits.splice(${i},1); renderCircuits();"
-                class="small-btn">Remove</button>
+                <input type="date" style="text-align: center; margin-left: 10px; border-radius: 15px; border: 1px solid #dddddd; padding: 0 4px;"
+                    value="${c.raceDate || ''}"
+                    onchange="selectedCircuits[${i}].raceDate=this.value; renderCircuits();">
+            </div>
+            <div style="display:flex;">
+                <div style="margin-right:10px;font-style:italic;">${c.city}, ${c.country}</div>
+                <div>
+                    <button type="button" style="font-size: 14px; border-radius: 20px; padding: 1px 6px; border: none; background: red; color: white;"
+                        onclick="selectedCircuits.splice(${i},1); renderCircuits();"
+                        class="small-btn">X</button>
+                </div>
+            </div>
+            
+        </div>
+        <div style="display:flex; justify-content: space-between; margin:0 35px; margin-top:5px;">
+            <div style="display:flex;">
+                <div>
+                    <label style="font-style:italic;">Points</label>
+                    <select onchange="selectedCircuits[${i}].pointSystemId=this.value; renderCircuits();" style="padding: 0 6px; border-radius: 20px; border: 1px solid #dddddd;">
+                        <option value="">Season Default</option>
+                        ${pointSystems.map(ps =>
+                            `<option value="${ps.id}"
+                            ${c.pointSystemId == ps.id ? 'selected' : ''}>
+                            ${ps.name}
+                            </option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div style="margin-left:20px;">                    
+                    <input type="checkbox" value="" style="font-size: 18px;  border-radius: 15px; border: 1px solid #dddddd; padding: 0 15px; font-weight: 400;"
+                        placeholder=""
+                        oninput="selectedCircuits[${i}].sprintRace=${c.sprintRace == 1 ? "0" : "1"}; renderCircuits();" ${c.sprintRace == 1 ? "checked" : ""}>
+                    <label style="font-style:italic;">Sprint Race</label>
+                </div>
+            </div>
+            <div style="font-style:italic;">
+                ${layoutName} - (${c.trackName})  
+            </div>
+        </div>
         `;
 
         list.appendChild(div);
@@ -359,9 +386,12 @@ function renderCircuits() {
             <input type="hidden" name="circuits[${i}][gp_name]" value="${c.gpName}">
             <input type="hidden" name="circuits[${i}][race_code]" value="${c.raceCode}">
             <input type="hidden" name="circuits[${i}][race_date]" value="${c.raceDate || ''}">
+            <input type="hidden" name="circuits[${i}][sprint_race]" value="${c.sprintRace}">
             <input type="hidden" name="circuits[${i}][point_system_id]" value="${c.pointSystemId}">
         `;
     });
+
+    console.log("Selected Circuits",selectedCircuits);
 }
 
 renderCircuits();

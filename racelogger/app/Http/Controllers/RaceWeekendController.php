@@ -11,16 +11,16 @@ use Illuminate\Validation\ValidationException;
 
 class RaceWeekendController extends Controller
 {
-    public function show(CalendarRace $race)
+    public function show(CalendarRace $race, Request $request)
     {
         if ($race->isLocked()) {
             return $this->showDetail($race);
         }
 
-        return $this->showManage($race);
+        return $this->showManage($race,$request);
     }
 
-    protected function showManage(CalendarRace $race)
+    public function showManage(CalendarRace $race, Request $request)
     {
         $race->load([
             'entryCars',

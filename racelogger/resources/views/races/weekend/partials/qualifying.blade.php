@@ -3,20 +3,23 @@
         ->with([
             'entryClass.raceClass',
             'entryClass.seasonEntry.entrant',
-            'carModel'
+            'carModel',
+            'drivers'
         ])
         ->get();
 
     $classGroups = $raceCars->groupBy(function($car) {
         return $car->entryClass->raceClass->id;
-    })->map(function($cars) {
-        return [
-            'name' => $cars->first()->entryClass->raceClass->name,
-            'display_order' => $cars->first()->entryClass->raceClass->display_order ?? 0,
-            'cars' => $cars->sortBy('car_number')->values()
-        ];
+        })->map(function($cars) {
+            return [
+                'name' => $cars->first()->entryClass->raceClass->name,
+                'display_order' => $cars->first()->entryClass->raceClass->display_order ?? 0,
+                'cars' => $cars->sortBy('car_number')->values(),
+                'car_details' => $cars
+            ];
     })->sortBy('display_order')->values();
 @endphp
+
 @php
     $savedSessions = $race->qualifyingSessions
         ->sortBy('session_order')
@@ -36,6 +39,7 @@
             ];
         })->values();
 @endphp
+
 @php
     function msToLap($ms) {
         if (!$ms) return null;
@@ -114,6 +118,8 @@ const contentContainer = document.getElementById('session-content');
 const savedSessions = @json($savedSessions);
 
 const classGroups = @json($classGroups);
+
+
 const totalParticipants = {{ $raceCars->count() }};
 let hasSavedSessions = savedSessions.length > 0;
 console.log(savedSessions);
@@ -235,14 +241,19 @@ function renderSessions() {
                                 ${group.cars.map(car => {
 
                                     const entrant = car.entry_class?.season_entry?.entrant?.name ?? '';
-                                    const livery = car.livery_name ?? '';
+                                    const livery = car.livery_name ?? '';   
                                     const carModel = car.car_model?.name ?? '';
+                                    const drivers = car.drivers
+                                                    ?.map(d => `${d.first_name} ${d.last_name}`)
+                                                    .join(', ') ?? '';
+
+                                    console.log("Drivers",car);
 
                                     const displayName = livery ? livery : entrant;
                                     let label = `#${car.car_number} ${displayName}`;
-                                    if (carModel) label += ` – ${carModel}`;
+                                    if (carModel) label += ` (${carModel})`;
 
-                                    return `<option value="${car.id}">${label}</option>`;
+                                    return `<option value="${car.id}">${label} - ${drivers}</option>`;
                                 }).join('')}
                             </select>
                         </td>

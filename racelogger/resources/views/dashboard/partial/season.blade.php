@@ -71,8 +71,6 @@
                                         break;
                                     }
                                 }
-
-                                echo "rowspan = $rowspan";
                             @endphp
                             <td >{{$team["name"]}}</td>
                             <td style="text-align:center;">{{$team["car_no"]}}</td>
@@ -122,52 +120,11 @@
 
     </div>
 
-
-    <div class="card">
-        <div class="card-header">
-            <h3>Driver Results</h3>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h3>Season Results</h3>
-            </div>
-
-            ```
-            <div class="card-body">
-
-                <table class="table table-bordered table-sm text-center">
-
-                    <thead>
-                        <tr>
-                            <th>Year</th>
-                            <th>Team</th>
-                            <?php
-                            print("<pre>");
-                            print_r($results);
-                            print("</pre>");
-                            ?>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-
-
-                    </tbody>
-
-                </table>
-
-            </div>
-            ```
-
-        </div>
-
-
-    </div>
-
-
-
-
+    <?php
+    // print("<pre>");
+    // print_r($results);
+    // print("</pre>");
+    ?>
 </div>
 
 <script>
