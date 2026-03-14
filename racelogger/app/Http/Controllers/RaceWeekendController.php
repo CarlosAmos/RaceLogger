@@ -17,16 +17,19 @@ class RaceWeekendController extends Controller
             return $this->showDetail($race);
         }
 
-        return $this->showManage($race,$request);
+        return $this->showManage($race, $request);
     }
 
     public function showManage(CalendarRace $race, Request $request)
     {
+
         $race->load([
             'entryCars',
             'raceSessions.results.drivers',
             'qualifyingSessions.results'
         ]);
+
+        $hasSprint = request('has_sprint');
 
         $participantsExist = $race->entryCars()->exists();
 
@@ -41,7 +44,6 @@ class RaceWeekendController extends Controller
         $defaultTab = request('tab');
 
         if (!$defaultTab) {
-
             if (!$participantsExist) {
                 $defaultTab = 'participants';
             } elseif (!$hasQualifyingResults) {
@@ -54,6 +56,15 @@ class RaceWeekendController extends Controller
         }
 
         if ($race->raceSessions()->count() === 0) {
+
+            if($hasSprint == 1) {
+                $race->raceSessions()->create([
+                    'name' => 'Race',
+                    'session_order' => 1,
+                    'is_sprint' => true,
+                    'reverse_grid' => false,
+                ]);
+            }
 
             $race->raceSessions()->create([
                 'name' => 'Race',
@@ -68,18 +79,33 @@ class RaceWeekendController extends Controller
 
         $raceSessionId = request('race_session_id');
 
-        $activeRaceSession = $race->raceSessions->first();
-
-        if ($raceSessionId) {
+        
+        $raceSessions = $race->raceSessions;
+        $activeRaceSession = $raceSessions->first();
+        $sprintRaceSession = null;
+        if(count($raceSessions) == 1) {
+            $raceSessions = $raceSessions->first();
+        } else if(count($raceSessions) > 1) {
+            foreach($raceSessions as $sessions => $session) {
+                if($session->is_sprint == 1) {
+                    $sprintRaceSession = $session;
+                } else {
+                    $activeRaceSession = $session;
+                }
+            }
+        } else if ($raceSessionId) {
             $activeRaceSession = $race->raceSessions
                 ->firstWhere('id', $raceSessionId)
                 ?? $activeRaceSession;
         }
 
+
         return view('races.weekend.manage', [
             'race' => $race,
             'defaultTab' => $defaultTab,
-            'activeRaceSession' => $activeRaceSession
+            'activeRaceSession' => $activeRaceSession,
+            'sprintRaceSession' => $sprintRaceSession,
+            'hasSprint' => $hasSprint
         ]);
     }
 
@@ -101,6 +127,7 @@ class RaceWeekendController extends Controller
     ) {
         $action = $request->input('action', 'save');
         $submittedTab = $request->input('submitted_tab');
+        $hasSprint = request('has_sprint');   
         $nextTab = "qualifying";
         try {
 
@@ -144,14 +171,25 @@ class RaceWeekendController extends Controller
                         ]);
                     }
                 }
+                $nextTab = ($hasSprint == 1 ? 'sprint_race' : 'race');
+            }
+            
+            if ($submittedTab === 'sprint_race') {
+                $data = $request->input('spr_results', []);
+                $raceSessionId = $request->input('sprint_race_session_id');
+
+
+                $resultService->saveSprintRaceResults([
+                    'race_session_id' => $raceSessionId,
+                    'results' => $request->input('spr_results', [])
+                ]);
                 $nextTab = 'race';
             }
-
             /*
-                |--------------------------------------------------------------------------
-                | Race Results (Per Session)
-                |--------------------------------------------------------------------------
-                */
+            |--------------------------------------------------------------------------
+            | Race Results (Per Session)
+            |--------------------------------------------------------------------------
+            */
             if ($submittedTab === 'race') {
 
                 $raceSessionId = $request->input('race_session_id');
@@ -175,13 +213,6 @@ class RaceWeekendController extends Controller
             dd($e->getMessage());
         }
 
-        // 🔥 Redirect to qualifying tab if participants exist
-        // if ($race->entryCars()->exists()) {
-        //     return redirect()
-        //         ->route('races.show', ['race' => $race->id, 'tab' => 'qualifying'])
-        //         ->with('success', 'Participants saved.');
-        // }
-
         if ($action === 'complete') {
 
             // Optional: mark race as completed/locked
@@ -200,7 +231,8 @@ class RaceWeekendController extends Controller
         return redirect()
             ->route('races.show', [
                 'race' => $race->id,
-                'tab' => $nextTab
+                'tab' => $nextTab,
+                'has_sprint' => $hasSprint
             ])
             ->with('success', ucfirst($submittedTab) . ' saved successfully.');
     }

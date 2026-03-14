@@ -20,13 +20,12 @@
 
     $totalPositions = $raceCars->count();
 
-    $savedResults = $activeRaceSession->results
+    $savedResults = $sprintRaceSession->results
         ->sortBy('position')
         ->values()
         ->keyBy('position');
 
-
-    function formatGap($result) {
+    function formatGap2($result) {
         if ($result->gap_laps_down) {
             return '+' . $result->gap_laps_down . 'L';
         }
@@ -42,7 +41,9 @@
 <div class="card shadow-sm">
 <div class="card-body">
 
-<h5 class="mb-4">Race Results</h5>
+<h5 class="mb-4">Sprint Race Results</h5>
+
+
 
 @if($raceCars->isEmpty())
     <div class="alert alert-warning">
@@ -50,7 +51,7 @@
     </div>
 @endif
 
-<input type="hidden" name="race_session_id" value="{{ $activeRaceSession->id }}">
+<input type="hidden" name="sprint_race_session_id" value="{{ $sprintRaceSession->id }}">
 
 <div class="table-responsive">
 <table class="table table-bordered table-sm align-middle text-center">
@@ -80,13 +81,13 @@
     <td class="fw-bold">
         {{ $pos }}
         <input type="hidden"
-               name="results[{{ $pos-1 }}][position]"
+               name="spr_results[{{ $pos-1 }}][position]"
                value="{{ $pos }}">
     </td>
 
     {{-- Car --}}
     <td>
-        <select name="results[{{ $pos-1 }}][entry_car_id]"
+        <select name="spr_results[{{ $pos-1 }}][entry_car_id]"
                 class="form-select form-select-sm race-select">
 
             <option value="">-- Select Car --</option>
@@ -95,17 +96,22 @@
 
                 <optgroup label="{{ $group['name'] }}">
 
-                    @foreach($group['cars'] as $car)
-
+                    @foreach($group['cars'] as $car)                        
                         @php
                             $entrant = $car->entryClass->seasonEntry->entrant->name ?? '';
                             $displayName = $car->livery_name ?? $entrant;
                             $carModel = $car->carModel->name ?? '';
 
-                            $label = "#{$car->car_number} {$displayName}";
-                            if($carModel) $label .= " – {$carModel}";
-                        @endphp
+                            $carDrivers = $car->drivers;
+                            $carDriverList = [];
+                            foreach($carDrivers as $drivers => $driver) {
+                                 $carDriverList[] = $driver->first_name." ".$driver->last_name;
+                            }
 
+                            $label = "#{$car->car_number} {$displayName} ";
+                            if($carModel) $label .= " ({$carModel}) - ".implode(", ",$carDriverList);
+                        @endphp        
+                        
                         <option value="{{ $car->id }}"
                             @selected($existing && $existing->entry_car_id == $car->id)>
                             {{ $label }}
@@ -122,7 +128,7 @@
 
     {{-- Status --}}
     <td>
-        <select name="results[{{ $pos-1 }}][status]"
+        <select name="spr_results[{{ $pos-1 }}][status]"
                 class="form-select form-select-sm">
 
             @foreach(['finished','dnf','dsq','dns'] as $status)
@@ -138,7 +144,7 @@
     {{-- Laps --}}
     <td>
         <input type="number"
-               name="results[{{ $pos-1 }}][laps_completed]"
+               name="spr_results[{{ $pos-1 }}][laps_completed]"
                class="form-control form-control-sm"
                value="{{ $existing->laps_completed ?? '' }}">
     </td>
@@ -146,16 +152,16 @@
     {{-- Gap --}}
     <td>
         <input type="text"
-               name="results[{{ $pos-1 }}][gap]"
+               name="spr_results[{{ $pos-1 }}][gap]"
                class="form-control form-control-sm gap-input"
                placeholder="0:00:000 or +1L"
-               value="{{ $existing ? formatGap($existing) : '' }}">
+               value="{{ $existing ? formatGap2($existing) : '' }}">
     </td>
 
     {{-- Fastest Lap --}}
     <td>
         <input type="text"
-               name="results[{{ $pos-1 }}][fastest_lap]"
+               name="spr_results[{{ $pos-1 }}][fastest_lap]"
                class="form-control form-control-sm lap-time-input"
                placeholder="0:00:000"
                value="{{ $existing ? msToLap($existing->fastest_lap_time_ms) : '' }}">

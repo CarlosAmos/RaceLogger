@@ -16,14 +16,14 @@
             </p>
         </div>
 
-        <a href="{{ route('seasons.show', [$race->season, 'tab' => 'results']) }}"
+        <a href="{{ route('seasons.show', [$race->season, 'tab' => 'results', 'has_sprint' => $hasSprint]) }}"
             class="btn btn-outline-secondary">
             Back to Season
         </a>
     </div>
 
     <form method="POST"
-        action="{{ route('races.weekend.update', $race) }}">
+        action="{{ route('races.weekend.update', [$race, 'has_sprint' => $hasSprint ]) }}">
 
         @csrf
         <input type="hidden" name="submitted_tab" id="submitted-tab">
@@ -46,7 +46,15 @@
                     Qualifying
                 </button>
             </li>
-
+            @if($hasSprint == 1)
+            <li class="nav-item">
+                <button class="nav-link {{ $defaultTab === 'sprint_race' ? 'active' : '' }} {{ !$participantsExist ? 'disabled' : '' }}"
+                    data-bs-toggle="{{ $participantsExist ? 'tab' : '' }}"
+                    data-bs-target="{{ $participantsExist ? '#sprint_race' : '' }}">
+                    Sprint Race
+                </button>
+            </li>
+            @endif
             <li class="nav-item">
                 <button class="nav-link {{ $defaultTab === 'race' ? 'active' : '' }} {{ !$participantsExist ? 'disabled' : '' }}"
                     data-bs-toggle="{{ $participantsExist ? 'tab' : '' }}"
@@ -76,6 +84,19 @@
                 </div>
                 @else
                 @include('races.weekend.partials.qualifying')
+                @endif
+
+            </div>
+
+                <div class="tab-pane fade {{ $defaultTab === 'sprint_race' ? 'show active' : '' }}"
+                id="sprint_race">
+
+                @if(!$participantsExist)
+                <div class="alert alert-warning">
+                    Please save participants first.
+                </div>
+                @else
+                @include('races.weekend.partials.sprint-race-results')
                 @endif
 
             </div>
@@ -131,6 +152,10 @@
 
         if (target === '#qualifying') {
             document.getElementById('submitted-tab').value = 'qualifying';
+        }
+
+        if (target === '#sprint_race') {
+            document.getElementById('submitted-tab').value = 'sprint_race';
         }
 
         if (target === '#race') {

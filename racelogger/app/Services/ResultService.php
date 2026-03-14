@@ -48,7 +48,61 @@ class ResultService
         $this->validateRaceResults($race, $data);
         $this->calculateClassPositions($race, $data['results']);
         // Calculate points
-        $this->pointsService->calculateWeekendPoints($race, $data['results']);
+        $this->pointsService->calculateWeekendPoints($race, $data['results'],0);
+
+        DB::transaction(function () use ($data, $raceSession) {
+
+            // Delete old results for this session only
+            Result::where('race_session_id', $raceSession->id)->delete();
+
+            foreach ($data['results'] as $resultData) {
+
+                if (empty($resultData['entry_car_id'])) {
+                    continue;
+                }
+
+                unset($resultData['drivers']);
+
+                $resultData['race_session_id'] = $raceSession->id;
+
+                $result = Result::create($resultData);
+
+                // Freeze drivers directly from entry car
+                $this->freezeDriversFromEntryCar(
+                    $result,
+                    $resultData['entry_car_id']
+                );
+            }
+        });
+    }
+
+    public function saveSprintRaceResults(array $data): void
+    {
+        if (empty($data['race_session_id'])) {
+            throw ValidationException::withMessages([
+                'race_session_id' => 'Race session is required.'
+            ]);
+        }
+
+        $raceSession = \App\Models\RaceSession::with([
+            'calendarRace.season.pointSystem.bonusRules',
+            'calendarRace.pointSystem.bonusRules',
+            'calendarRace.entryCars.entryClass',
+            'calendarRace.qualifyingSessions.results'
+        ])->findOrFail($data['race_session_id']);
+
+        $race = $raceSession->calendarRace;
+        
+        if ($race->isLocked()) {
+            throw ValidationException::withMessages([
+                'race' => 'This race is locked and cannot be modified.'
+            ]);
+        }
+
+        $this->validateRaceResults($race, $data);
+        $this->calculateClassPositions($race, $data['results']);
+        // Calculate points
+        $this->pointsService->calculateWeekendPoints($race, $data['results'],1);
 
         DB::transaction(function () use ($data, $raceSession) {
 
@@ -93,10 +147,10 @@ class ResultService
         $fastestLapCandidate = null;
 
         /*
-    |--------------------------------------------------------------------------
-    | First Pass — Validate & Detect Fastest Lap
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | First Pass — Validate & Detect Fastest Lap
+        |--------------------------------------------------------------------------
+        */
 
         foreach ($data['results'] as $index => &$result) {
             // Convert fastest lap string to milliseconds
@@ -206,20 +260,20 @@ class ResultService
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Apply Fastest Lap
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Apply Fastest Lap
+        |--------------------------------------------------------------------------
+        */
 
         if ($fastestLapCandidate) {
             $data['results'][$fastestLapCandidate['index']]['fastest_lap'] = true;
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Second Pass — Compute Class Positions
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Second Pass — Compute Class Positions
+        |--------------------------------------------------------------------------
+        */
 
         // Sort results by overall position
         usort($data['results'], function ($a, $b) {

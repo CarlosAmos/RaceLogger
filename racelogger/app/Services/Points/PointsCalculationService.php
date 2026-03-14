@@ -3,14 +3,14 @@
 namespace App\Services\Points;
 
 use App\Models\CalendarRace;
+use App\Models\PointsSystem;
 use Illuminate\Validation\ValidationException;
 
 class PointsCalculationService
 {
-    public function calculateWeekendPoints($race, array &$results): void
+    public function calculateWeekendPoints($race, array &$results, $sprintRace): void
     {
-        $pointSystem = $race->pointSystem
-            ?? $race->season->pointSystem;
+        $pointSystem = \App\Models\PointSystem::with(['rules', 'bonusRules'])->find(13);
 
         if (!$pointSystem) {
             foreach ($results as &$result) {
@@ -30,11 +30,12 @@ class PointsCalculationService
         $fastestLapRule = $bonusRules
             ->firstWhere('type', 'fastest_lap');
 
+       
         /*
-    |--------------------------------------------------------------------------
-    | 1️⃣ Base Race Points
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | 1️⃣ Base Race Points
+        |--------------------------------------------------------------------------
+        */
 
         foreach ($results as &$result) {
 
@@ -58,12 +59,12 @@ class PointsCalculationService
 
             $result['points_awarded'] = $points;
         }
-
+ 
         /*
-    |--------------------------------------------------------------------------
-    | 2️⃣ Qualifying Points (Final Session Only)
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | 2️⃣ Qualifying Points (Final Session Only)
+        |--------------------------------------------------------------------------
+        */
 
         if ($qualifyingRules->isNotEmpty()) {
 
@@ -117,10 +118,10 @@ class PointsCalculationService
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | 3️⃣ Fastest Lap Bonus
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | 3️⃣ Fastest Lap Bonus
+        |--------------------------------------------------------------------------
+        */
 
         if ($fastestLapRule) {
 

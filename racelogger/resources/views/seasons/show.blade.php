@@ -59,6 +59,11 @@
         color: white;
         font-weight: 600;
     }
+
+    .container {
+        max-width: max-content;
+        width:100%;
+    }
 </style>
 <div class="container">
 
@@ -321,6 +326,7 @@
                 @if(count($sortedRows) > 0)
                     @foreach($sortedRows as $row)
 
+                    
                     <tr class="{{ $loop->first ? 'leader-row' : '' }}">
                         <td>{{ $loop->iteration }}</td>
 
@@ -408,6 +414,8 @@
                             }
 
                             
+                        } else {
+                            
                         }
                         
                         @endphp
@@ -478,40 +486,47 @@
                             $raceCount = $race->sprint_race == 1 ? 2 : 1;
                         @endphp
 
-                        @for($i = 0; $i < $raceCount; $i++)                        
-                            @php
-                            $finalSession = $race->qualifyingSessions
-                            ->sortByDesc('session_order')
-                            ->first();
+                    
+                        @php
+                        $finalSession = $race->qualifyingSessions
+                        ->sortByDesc('session_order')
+                        ->first();
 
-                            $pole = null;
+                        $pole = null;
 
-                            if ($finalSession) {
-                            $pole = $finalSession->results
-                            ->filter(function ($result) use ($race, $currentClassId) {
+                        if ($finalSession) {
+                        $pole = $finalSession->results
+                        ->filter(function ($result) use ($race, $currentClassId) {
 
-                            $entryCar = $race->entryCars
-                            ->firstWhere('id', $result->entry_car_id);
+                        $entryCar = $race->entryCars
+                        ->firstWhere('id', $result->entry_car_id);
 
-                            return $entryCar
-                            && $entryCar->entryClass->race_class_id == $currentClassId;
-                            })
-                            ->sortBy('position')
-                            ->first();
-                            }
-                            @endphp
+                        return $entryCar
+                        && $entryCar->entryClass->race_class_id == $currentClassId;
+                        })
+                        ->sortBy('position')
+                        ->first();
+                        }
+                        @endphp
+                        
+                        @if($raceCount > 1)
+                        <td>
 
-                            <td>
-                                @if($pole)
-                                <div>#{{ $pole->entryCar->car_number }}</div>
-                                <small class="text-muted">
-                                    {{ msToLap($pole->best_lap_time_ms) }}
-                                </small>
-                                @else
-                                -
-                                @endif
-                            </td>
-                        @endfor
+
+                        </td>
+                        @endif
+
+                        <td>
+                            @if($pole)
+                            <div>#{{ $pole->entryCar->car_number }}</div>
+                            <small class="text-muted">
+                                {{ msToLap($pole->best_lap_time_ms) }}
+                            </small>
+                            @else
+                            -
+                            @endif
+                        </td>
+
                     @endforeach
 
                     <td></td>
