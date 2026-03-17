@@ -10,7 +10,16 @@ class PointsCalculationService
 {
     public function calculateWeekendPoints($race, array &$results, $sprintRace): void
     {
-        $pointSystem = \App\Models\PointSystem::with(['rules', 'bonusRules'])->find(13);
+        if($sprintRace == 0) {
+            $pointSystem = $race->pointSystem
+                ?? $race->season->pointSystem;
+        } else {
+            $pointSystem = \App\Models\PointSystem::with(['rules', 'bonusRules'])->find(13);
+        }
+
+
+
+
 
         if (!$pointSystem) {
             foreach ($results as &$result) {

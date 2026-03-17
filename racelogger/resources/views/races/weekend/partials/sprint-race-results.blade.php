@@ -17,10 +17,10 @@
             'cars' => $cars->sortBy('car_number')->values()
         ];
     })->sortBy('display_order')->values();
-
+    
     $totalPositions = $raceCars->count();
 
-    $savedResults = $sprintRaceSession->results
+    $savedSprintResults = $sprintRaceSession->results
         ->sortBy('position')
         ->values()
         ->keyBy('position');
@@ -37,7 +37,6 @@
         return null;
     }
 @endphp
-
 <div class="card shadow-sm">
 <div class="card-body">
 
@@ -72,7 +71,7 @@
 @for($pos = 1; $pos <= $totalPositions; $pos++)
 
 @php
-    $existing = $savedResults[$pos] ?? null;
+    $existingSprint = $savedSprintResults[$pos] ?? null;
 @endphp
 
 <tr>
@@ -88,7 +87,7 @@
     {{-- Car --}}
     <td>
         <select name="spr_results[{{ $pos-1 }}][entry_car_id]"
-                class="form-select form-select-sm race-select">
+                class="form-select form-select-sm sprint-race-select">
 
             <option value="">-- Select Car --</option>
 
@@ -113,7 +112,7 @@
                         @endphp        
                         
                         <option value="{{ $car->id }}"
-                            @selected($existing && $existing->entry_car_id == $car->id)>
+                            @selected($existingSprint && $existingSprint->entry_car_id == $car->id)>
                             {{ $label }}
                         </option>
 
@@ -133,7 +132,7 @@
 
             @foreach(['finished','dnf','dsq','dns'] as $status)
                 <option value="{{ $status }}"
-                    @selected($existing && $existing->status === $status)>
+                    @selected($existingSprint && $existingSprint->status === $status)>
                     {{ strtoupper($status) }}
                 </option>
             @endforeach
@@ -146,7 +145,7 @@
         <input type="number"
                name="spr_results[{{ $pos-1 }}][laps_completed]"
                class="form-control form-control-sm"
-               value="{{ $existing->laps_completed ?? '' }}">
+               value="{{ $existingSprint->laps_completed ?? '' }}">
     </td>
 
     {{-- Gap --}}
@@ -155,7 +154,7 @@
                name="spr_results[{{ $pos-1 }}][gap]"
                class="form-control form-control-sm gap-input"
                placeholder="0:00:000 or +1L"
-               value="{{ $existing ? formatGap2($existing) : '' }}">
+               value="{{ $existingSprint ? formatGap2($existingSprint) : '' }}">
     </td>
 
     {{-- Fastest Lap --}}
@@ -164,13 +163,12 @@
                name="spr_results[{{ $pos-1 }}][fastest_lap]"
                class="form-control form-control-sm lap-time-input"
                placeholder="0:00:000"
-               value="{{ $existing ? msToLap($existing->fastest_lap_time_ms) : '' }}">
+               value="{{ $existingSprint ? msToLap($existingSprint->fastest_lap_time_ms) : '' }}">
     </td>
 
 </tr>
 
 @endfor
-
 </tbody>
 </table>
 </div>
@@ -183,7 +181,7 @@
 document.addEventListener('DOMContentLoaded', function () {
 
     // Prevent duplicate car selection
-    const selects = document.querySelectorAll('.race-select');
+    const selects = document.querySelectorAll('.sprint-race-select');
 
     selects.forEach(select => {
         select.addEventListener('change', function () {

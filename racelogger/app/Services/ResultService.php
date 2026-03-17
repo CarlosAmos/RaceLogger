@@ -49,7 +49,7 @@ class ResultService
         $this->calculateClassPositions($race, $data['results']);
         // Calculate points
         $this->pointsService->calculateWeekendPoints($race, $data['results'],0);
-
+        
         DB::transaction(function () use ($data, $raceSession) {
 
             // Delete old results for this session only

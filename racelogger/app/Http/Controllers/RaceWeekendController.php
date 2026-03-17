@@ -99,7 +99,6 @@ class RaceWeekendController extends Controller
                 ?? $activeRaceSession;
         }
 
-
         return view('races.weekend.manage', [
             'race' => $race,
             'defaultTab' => $defaultTab,

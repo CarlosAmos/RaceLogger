@@ -156,6 +156,7 @@ class SeasonController extends Controller
             'seasonEntries.entryClasses.entryCars.carModel.constructor',
             'seasonEntries.entryClasses.entryCars.drivers.country',
             'calendarRaces.results',
+            'calendarRaces.raceSessions'
         ]);
         
         $scenarioService = new ChampionshipScenarioService();

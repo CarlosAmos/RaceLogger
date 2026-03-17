@@ -102,8 +102,14 @@
                             $displayName = $car->livery_name ?? $entrant;
                             $carModel = $car->carModel->name ?? '';
 
+                            $carDrivers = $car->drivers;
+                            $carDriverList = [];
+                            foreach($carDrivers as $drivers => $driver) {
+                                 $carDriverList[] = $driver->first_name." ".$driver->last_name;
+                            }
+
                             $label = "#{$car->car_number} {$displayName}";
-                            if($carModel) $label .= " – {$carModel}";
+                            if($carModel) $label .= " ({$carModel}) - ".implode(", ",$carDriverList);
                         @endphp
 
                         <option value="{{ $car->id }}"

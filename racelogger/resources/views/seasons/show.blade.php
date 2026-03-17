@@ -122,49 +122,48 @@
             'rows' => []
         ];
     }
-
+    
     /* Populate from results */
     foreach ($races as $race) {
 
-    foreach ($race->results as $result) {
+        foreach ($race->results as $result) {
 
-    $entryCar = $race->entryCars
-    ->firstWhere('id', $result->entry_car_id);
+            $entryCar = $race->entryCars
+            ->firstWhere('id', $result->entry_car_id);
 
-    if (!$entryCar) continue;
+            if (!$entryCar) continue;
 
-    $classId = $entryCar->entryClass->race_class_id;
+            $classId = $entryCar->entryClass->race_class_id;
 
-    if (!isset($classTables[$classId])) continue;
+            if (!isset($classTables[$classId])) continue;
 
-    foreach ($result->resultDrivers ?? [] as $resultDriver) {
+            foreach ($result->resultDrivers ?? [] as $resultDriver) {
 
-    $driver = $resultDriver->driver;
-    if (!$driver) continue;
+            $driver = $resultDriver->driver;
+            if (!$driver) continue;
 
-    $driverId = $driver->id;
+            $driverId = $driver->id;
 
-    if (!isset($classTables[$classId]['rows'][$driverId])) {
-    $classTables[$classId]['rows'][$driverId] = [
-    'driver' => $driver,
-    'team' => $entryCar->entryClass->seasonEntry->entrant ?? null,
-    'car_number' => $entryCar->car_number,
-    'raceResults' => [],
-    'totalPoints' => 0
-    ];
-    }
+            if (!isset($classTables[$classId]['rows'][$driverId])) {
+            $classTables[$classId]['rows'][$driverId] = [
+            'driver' => $driver,
+            'team' => $entryCar->entryClass->seasonEntry->entrant ?? null,
+            'car_number' => $entryCar->car_number,
+            'raceResults' => [],
+            'totalPoints' => 0
+            ];
+            }
 
-    $classTables[$classId]['rows'][$driverId]['raceResults'][$race->id] = $result;
-    $classTables[$classId]['rows'][$driverId]['totalPoints'] += $result->points_awarded;
-    }
-    }
+            $classTables[$classId]['rows'][$driverId]['raceResults'][$result->race_session_id] = $result;
+            $classTables[$classId]['rows'][$driverId]['totalPoints'] += $result->points_awarded;
+            }
+        }
     }
 
     $classTables = collect($classTables)
-    ->sortBy('display_order')
-    ->values();
+        ->sortBy('display_order')
+        ->values();
     @endphp
-
     <div style="display:flex;justify-content: center;">
         @if(count($classTables) > 0)
             <h4 class="fw-bold">Potential Champion{{count($classTables) > 1 ? "s" : ""}}</h4>
@@ -290,7 +289,7 @@
                     <th class="text-start">Driver</th>
                     <th>No.</th>
                     <th class="text-start">Team</th>
-
+                    
                     @foreach($races as $race)
                     
                     @php                         
@@ -323,6 +322,7 @@
                     ->sortByDesc('totalPoints')
                     ->values();
                 @endphp
+                
                 @if(count($sortedRows) > 0)
                     @foreach($sortedRows as $row)
 
@@ -342,103 +342,110 @@
                         </td>
 
                         @foreach($races as $race)
+                            @foreach($race->raceSessions as $raceSession)
 
-                        @php
-                        $result = $row['raceResults'][$race->id] ?? null;
+                            
+                            @php
+                            $result = $row['raceResults'][$raceSession->id] ?? null;
 
-                        $cellClass = '';
-                        $pBadge = false;
-                        $flBadge = false;
+                            $cellClass = '';
+                            $pBadge = false;
+                            $flBadge = false;
 
-                        if ($result) {
+                            if ($result) {
 
-                            if (is_numeric($result->class_position) && $result->status === "finished") {
-                                    if ($result->class_position == 1) {
-                                    $cellClass = 'bg-warning text-dark';
-                                    } elseif ($result->class_position == 2) {
-                                    $cellClass = 'bg-secondary text-white';
-                                    } elseif ($result->class_position == 3) {
-                                    $cellClass = 'bg-bronze text-white';
-                                    } elseif ($result->points_awarded > 0) {
-                                        $cellClass = 'bg-success text-white';
-                                    }
-                            } else {
-                                switch (strtoupper($result->status)) {
-                                    case 'DSQ':
-                                    $cellClass = 'bg-dark text-white';
-                                    break;
-                                    case 'RET':
-                                    case 'DNF':
-                                    $cellClass = 'dnf_details text-white';
-                                    break;
-                                    case 'DNS':
-                                    $cellClass = 'bg-white text-dark';
-                                    break;
-                                    case 'DNQ':
-                                    case 'DNPQ':
-                                    $cellClass = 'bg-danger text-white';
-                                    break;
-                            }
-                            }
+                                if (is_numeric($result->class_position) && $result->status === "finished") {
+                                        if ($result->class_position == 1) {
+                                        $cellClass = 'bg-warning text-dark';
+                                        } elseif ($result->class_position == 2) {
+                                        $cellClass = 'bg-secondary text-white';
+                                        } elseif ($result->class_position == 3) {
+                                        $cellClass = 'bg-bronze text-white';
+                                        } elseif ($result->points_awarded > 0) {
+                                            $cellClass = 'bg-success text-white';
+                                        }
+                                } else {
+                                    switch (strtoupper($result->status)) {
+                                        case 'DSQ':
+                                        $cellClass = 'bg-dark text-white';
+                                        break;
+                                        case 'RET':
+                                        case 'DNF':
+                                        $cellClass = 'dnf_details text-white';
+                                        break;
+                                        case 'DNS':
+                                        $cellClass = 'bg-white text-dark';
+                                        break;
+                                        case 'DNQ':
+                                        case 'DNPQ':
+                                        $cellClass = 'bg-danger text-white';
+                                        break;
+                                }
+                                }
 
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Class-Based Pole Detection
-                            |--------------------------------------------------------------------------
-                            */
-                            $finalSession = $race->qualifyingSessions
-                            ->sortByDesc('session_order')
-                            ->first();
-
-                            if ($finalSession) {
-
-                                $classPole = $finalSession->results
-                                ->filter(function ($qResult) use ($race, $currentClassId) {
-
-                                $entryCar = $race->entryCars
-                                ->firstWhere('id', $qResult->entry_car_id);
-
-                                return $entryCar
-                                && $entryCar->entryClass->race_class_id == $currentClassId;
-                                })
-                                ->sortBy('position')
+                                /*
+                                |--------------------------------------------------------------------------
+                                | Class-Based Pole Detection
+                                |--------------------------------------------------------------------------
+                                */
+                                $finalSession = $race->qualifyingSessions
+                                ->sortByDesc('session_order')
                                 ->first();
 
-                                if ($classPole && $classPole->entry_car_id == $result->entry_car_id) {
-                                $pBadge = true;
+                                if ($finalSession) {
+
+                                    $classPole = $finalSession->results
+                                    ->filter(function ($qResult) use ($race, $currentClassId) {
+
+                                    $entryCar = $race->entryCars
+                                    ->firstWhere('id', $qResult->entry_car_id);
+
+                                    return $entryCar
+                                    && $entryCar->entryClass->race_class_id == $currentClassId;
+                                    })
+                                    ->sortBy('position')
+                                    ->first();
+
+                                    if ($classPole && $classPole->entry_car_id == $result->entry_car_id) {
+                                    $pBadge = true;
+                                    }
                                 }
-                            }
 
-                            if ($result->fastest_lap) {
-                                $flBadge = true;
-                            }
+                                if ($result->fastest_lap) {
+                                    $flBadge = true;
+                                }
 
+                                
+                            } else {
                             
-                        } else {
+                            }
                             
-                        }
-                        
-                        @endphp
+                            @endphp
 
-                        <td class="{{ $cellClass }} result-cell cell_style">
-                            @if($result)
-                            @if($result->status == "finished") {{ $result->class_position }} 
-                            @else {{ strtoupper($result->status) }} 
-                            @endif
-                            @if($pBadge)
-                            <span class="mini-badge badge-p">P</span>
-                            @endif
+                            <td class="{{ $cellClass }} result-cell cell_style">
+                                @if($result)
+                                @if($result->status == "finished") {{ $result->class_position }} 
+                                @else {{ strtoupper($result->status) }} 
+                                @endif
+                                @if($pBadge)
+                                <span class="mini-badge badge-p">P</span>
+                                @endif
 
-                            @if($flBadge)
-                            <span class="mini-badge badge-fl">FL</span>
-                            @endif
-                            @else
+                                @if($flBadge)
+                                <span class="mini-badge badge-fl">FL</span>
+                                @endif
+                                @else
 
+                                @endif
+                            </td>
+                            @endforeach                              
+                            
+                            @if(count($race->raceSessions) == 0) 
+                            <td class=" result-cell cell_style" colspan={{ ($race->sprint_race == 1 ? "2" : "1") }}></td>  
                             @endif
-                        </td>
 
                         @endforeach
-
+                            
                         <td class="fw-bold cell_style">{{ $row['totalPoints'] }}</td>
 
                     </tr>
@@ -596,6 +603,9 @@
     $className = "FIA Endurance Trophy for ".$className." Teams";
     $teamScoringMode = 'per_car';
     break;
+    case "Overall":
+        $teamScoringMode = 'best_car';
+        break;
     default:
         $teamScoringMode = 'per_car';
         break;
