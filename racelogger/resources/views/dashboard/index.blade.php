@@ -6,7 +6,7 @@
     .container {
         margin-right: 0 !important;
         margin-left: 0 !important;
-        width:100%;
+        width: 100%;
         max-width: 100% !important;
     }
 
@@ -29,25 +29,26 @@
 
     .calender_race.nls {
         border-radius: 20px;
-        border: 2px solid #c97900; 
-        background: #c9790094;        
+        border: 2px solid #c97900;
+        background: #c9790094;
     }
 
     .calender_race.igc {
         border-radius: 20px;
-        border: 2px solid #9000c9; 
+        border: 2px solid #9000c9;
         background: #9000c994;
     }
 
     .calender_race.f2 {
         border-radius: 20px;
-        border: 2px solid #bd5656; 
+        border: 2px solid #bd5656;
         background: #bd56569d;
         color: white;
     }
+
     .calender_race.f1 {
         border-radius: 20px;
-        border: 2px solid #ff0000; 
+        border: 2px solid #ff0000;
         background: #ff000075;
         color: white;
     }
@@ -73,8 +74,9 @@
     .calender_race_divider.f2 {
         color: #bd5656;
     }
+
     .calender_race_divider.f1 {
-        color: #ff0000; 
+        color: #ff0000;
     }
 </style>
 
@@ -134,9 +136,6 @@
 
     </div>
     <div style="display: flex; gap: 5px; flex-wrap: wrap; flex-direction: column;margin-left:10px;">
-        <div style="display:flex; width:100%">
-        @include('dashboard.partial.season', ['results' => $results])
-        </div>
         <div style="display: flex;">
             <h3 style="margin:0;">Active Series</h3>
             <div class="dashboard-actions">
@@ -159,13 +158,13 @@
             @php
 
             if($season->year !== $lastYear) {
-                echo '<div style="width:100%"></div>';
-                $lastYear = $season->year;
+            echo '<div style="width:100%"></div>';
+            $lastYear = $season->year;
             }
 
             @endphp
             <div style="border:1px solid #ccc; padding:15px; width:220px; background:#fff; margin:5px;">
-                
+
                 <h4>{{ $season->series->name }} - {{ $season->year }}</h4>
 
                 <div style="margin-top:10px;">
@@ -183,7 +182,11 @@
             </div>
             @endforeach
         </div>
+        <div style="display:flex; width:100%; margin-top:20px; margin-left:10px;">
+            @include('dashboard.partial.season')
+        </div>
     </div>
+
 </div>
 
 

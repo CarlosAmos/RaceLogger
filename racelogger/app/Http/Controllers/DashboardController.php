@@ -9,11 +9,12 @@ use App\Models\Driver;
 use App\Models\CalendarRace;
 use App\Models\SeasonEntry;
 use App\Models\ResultDriver;
+use App\Services\DriverCareerService;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(DriverCareerService $service)
     {
         $worldId = session('active_world_id');
 
@@ -38,16 +39,18 @@ class DashboardController extends Controller
             ->get();
 
         $myId = 194; // My Id
-        //$myId = 186;
-        
-        $results = $this->getDriverSeasonResults($myId, $worldId);
+        // $myId = 186;
+        // $myId = 161;
+        //$results = $this->getDriverSeasonResults($myId, $worldId);
+        $careerMap = $service->getCareerStructure($myId);
 
+        //dd($careerMap);
         return view('dashboard.index', compact(
             'world',
             'currentYear',
             'seasons',
             'upcomingRaces',
-            'results'
+            'careerMap'
         ));
     }
 
@@ -61,6 +64,8 @@ class DashboardController extends Controller
         ])
         ->where('driver_id', $driverId)
         ->get();
+
+        
        
         $raceCalendars = CalendarRace::with([
             'season.series'
@@ -83,6 +88,7 @@ class DashboardController extends Controller
 
         foreach($driverResults as $driverResult) {
             $race = $driverResult->result->raceSession->calendarRace;
+            $raceResult = $driverResult->result;
             //$qualiSessions = $driverResult->result->raceSession->calendarRace->qualifyingSessions;
             $qualiSessions = $driverResult->result->raceSession->calendarRace->qualifyingSessions;
             $entryCar =  $driverResult->result->entryCar;
@@ -110,10 +116,12 @@ class DashboardController extends Controller
                 'race_code' => $race->race_code,
             ];
 
+            
+
             $seasons[$season->year][$seasonId]["teams"][$entryCarId]["name"] = $entrantCar->name;
             $seasons[$season->year][$seasonId]["teams"][$entryCarId]["car_no"] = $entryCar->car_number;
             $seasons[$season->year][$seasonId]["teams"][$entryCarId]["position"] = "1st";
-            $seasons[$season->year][$seasonId]["teams"][$entryCarId]["results"][$race->round_number] = [
+            $seasons[$season->year][$seasonId]["teams"][$entryCarId]["results"][$raceResult->race_session_id] = [
                 'class_position' => $driverResult->result->class_position,
                 'fastest_lap' =>  $driverResult->result->fastest_lap,
                 'points' => $driverResult->result->points_awarded,
@@ -122,6 +130,7 @@ class DashboardController extends Controller
             // ? Serie
             $seasons[$season->year][$seasonId]["series"] = $series;            
         }
+        //dd($driverResult);
         
         // ? Add new season details to career including races
         foreach($upcomingDriver as $index => $upcoming) {

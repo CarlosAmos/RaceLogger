@@ -8,6 +8,12 @@
         font-weight: 500;
     }
 
+    .dns-details {
+        color: #a5a5a5 !important;
+        font-weight: 100;
+        font-style: italic;
+    }
+
     .mini-badge {
         margin-left: 0 !important;
     }
@@ -165,7 +171,7 @@
         ->values();
     @endphp
     <div style="display:flex;justify-content: center;">
-        @if(count($classTables) > 0)
+        @if(count($classScenarios) > 0)
             <h4 class="fw-bold">Potential Champion{{count($classTables) > 1 ? "s" : ""}}</h4>
         @endif
     </div>
@@ -313,6 +319,7 @@
                     @endforeach
 
                     <th>Pts</th>
+                    <th></th>
                 </tr>
             </thead>
 
@@ -321,6 +328,8 @@
                 $sortedRows = collect($class['rows'] ?? [])
                     ->sortByDesc('totalPoints')
                     ->values();
+
+                    $firstPlacePoints = 0;
                 @endphp
                 
                 @if(count($sortedRows) > 0)
@@ -374,7 +383,7 @@
                                         $cellClass = 'dnf_details text-white';
                                         break;
                                         case 'DNS':
-                                        $cellClass = 'bg-white text-dark';
+                                        $cellClass = 'bg-white text-dark dns-details';
                                         break;
                                         case 'DNQ':
                                         case 'DNPQ':
@@ -445,9 +454,18 @@
                             @endif
 
                         @endforeach
-                            
-                        <td class="fw-bold cell_style">{{ $row['totalPoints'] }}</td>
 
+                        @php
+                        if($loop->iteration == 1) $firstPlacePoints = $row['totalPoints'];
+                            
+                        @endphp
+
+                        <td class="fw-bold cell_style">{{ $row['totalPoints'] }}</td>
+                        @if($loop->iteration > 1)
+                        <td class="fw-bold cell_style">{{ $row['totalPoints'] - $firstPlacePoints  }}</td>
+                        @else
+                        <td class="fw-bold cell_style"></td>
+                        @endif
                     </tr>
                     @endforeach
 
