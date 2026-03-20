@@ -162,6 +162,7 @@
             $lastYear = $season->year;
             }
 
+            if($season->year < 1980) continue;
             @endphp
             <div style="border:1px solid #ccc; padding:15px; width:220px; background:#fff; margin:5px;">
 

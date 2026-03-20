@@ -67,6 +67,7 @@
             <a href="{{ route('worlds.constructors.index', $world) }}">Teams</a>
             
             <a href="{{ route('drivers.index') }}">Drivers</a>
+            <a href="{{ route('records.index') }}">Records</a>
             <a href="{{ route('world.select') }}">Change World</a>
         </div>
     @endif

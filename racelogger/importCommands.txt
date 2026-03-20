@@ -1,0 +1,3 @@
+php artisan import:f1-calendar {year}
+php artisan import:f1-entries  {year}
+php artisan import:f1-results  {year}

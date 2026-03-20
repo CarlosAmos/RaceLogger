@@ -10,11 +10,12 @@ use App\Models\CalendarRace;
 use App\Models\SeasonEntry;
 use App\Models\ResultDriver;
 use App\Services\DriverCareerService;
+use App\Services\CareerResultsGridService;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index(DriverCareerService $service)
+    public function index(DriverCareerService $service, CareerResultsGridService $gridService)
     {
         $worldId = session('active_world_id');
 
@@ -33,7 +34,10 @@ class DashboardController extends Controller
         $upcomingRaces = CalendarRace::with(['season.series','trackLayout.track'])
             ->where('is_locked', 0)
             ->whereHas('season', function ($query) use ($currentYear) {
-                $query->where('year','>=' , $currentYear);
+                $query->where('year', '>=', $currentYear);
+            })
+            ->whereHas('season.series', function ($query) use ($worldId) {
+                $query->where('world_id', $worldId);
             })
             ->orderBy('race_date', 'asc')
             ->get();
@@ -42,7 +46,8 @@ class DashboardController extends Controller
         // $myId = 186;
         // $myId = 161;
         //$results = $this->getDriverSeasonResults($myId, $worldId);
-        $careerMap = $service->getCareerStructure($myId);
+        $careerMap   = $service->getCareerStructure($myId, $worldId);
+        $resultsGrid = $gridService->getResultsGrid($myId, $worldId);
 
         //dd($careerMap);
         return view('dashboard.index', compact(
@@ -50,7 +55,8 @@ class DashboardController extends Controller
             'currentYear',
             'seasons',
             'upcomingRaces',
-            'careerMap'
+            'careerMap',
+            'resultsGrid'
         ));
     }
 

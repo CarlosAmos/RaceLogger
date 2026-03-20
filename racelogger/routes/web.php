@@ -26,6 +26,7 @@ use App\Http\Controllers\WorldDriverController;
 use App\Http\Controllers\EntryCarDriverController;
 use App\Http\Controllers\PointSystemController;
 use App\Http\Controllers\RaceWeekendController;
+use App\Http\Controllers\LapRecordController;
 
 
 Route::get('/', function () {
@@ -59,6 +60,8 @@ Route::post('/world/select/{world}', [WorldController::class, 'select'])
 Route::middleware(['world.selected'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
+    Route::get('/records', [LapRecordController::class, 'index'])
+        ->name('records.index');
 });
 Route::get('/worlds/{world}/created', [WorldController::class, 'created'])
     ->name('worlds.created');

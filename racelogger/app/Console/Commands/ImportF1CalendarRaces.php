@@ -7,6 +7,7 @@ use App\Models\Season;
 use App\Models\Track;
 use App\Models\TrackLayout;
 use App\Models\CalendarRace;
+use Carbon\Carbon;
 
 class ImportF1CalendarRaces extends Command
 {
@@ -108,7 +109,7 @@ class ImportF1CalendarRaces extends Command
                 'round_number' => $data['round'],
                 'gp_name' => $data['name'],
                 'race_code' => strtoupper(substr($data['name'],0,3)),
-                'race_date' => $data['date'],
+                'race_date' => $this->parseDate($data['date']),
                 'is_locked' => 1,
                 'created_at' => now(),
                 'updated_at' => now()
@@ -120,5 +121,19 @@ class ImportF1CalendarRaces extends Command
         fclose($handle);
 
         $this->info("Calendar import complete for {$year}");
+    }
+
+    /**
+     * Parse an Ergast date string to Y-m-d format.
+     * Handles both YYYY-MM-DD and DD/MM/YYYY (older seasons).
+     */
+    private function parseDate(string $value): string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return $value;
+        }
+
+        // DD/MM/YYYY → swap to YYYY-MM-DD via Carbon
+        return Carbon::createFromFormat('d/m/Y', $value)->format('Y-m-d');
     }
 }

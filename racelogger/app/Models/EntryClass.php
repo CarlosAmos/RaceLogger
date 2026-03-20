@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class EntryClass extends Model
 {
     protected $fillable = [
+        'entry_id',
+        'season_entry_id',
         'race_class_id',
     ];
     //

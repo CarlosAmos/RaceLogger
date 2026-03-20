@@ -7,17 +7,18 @@
         width: 100%;
         overflow-x: auto;
         border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e2e8f0;
+        /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0; */
         margin: 20px 0;
     }
 
     .career-table {
-        width: 100%;
         border-collapse: collapse;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
         font-size: 13px;
         background: white;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0;
     }
 
     /* Header Styling */
@@ -108,7 +109,7 @@
     }
 
     .pos-first {
-        background: #ffc1078c;
+        background: #fffb4cb5;
     }
 
     .pos-second {
@@ -116,8 +117,19 @@
     }
 
     .pos-third {
-        background: #e371007a
+        background: #FFDF9F;
     }
+
+    .pos-general {
+        background: rgba(34, 197, 94, 0.25);
+    }
+
+    .pos-dnf {
+        background: rgba(100, 98, 184, 0.25);
+    }
+
+    .result-label-active { color: #000; }
+    .result-label-inactive { color: #94a3b8; }
 </style>
 
 <div style="width:100%">
@@ -131,10 +143,10 @@
                     <th class="col-series">Series</th>
                     <th class="col-team">Team</th>
                     <th class="col-stat">Races</th>
-                    <th class="col-stat">Wins</th>
-                    <th class="col-stat">Podiums</th>
+                    <th class="col-stat">Wins</th>                    
                     <th class="col-stat">Poles</th>
                     <th class="col-stat">FL</th>
+                    <th class="col-stat">Podiums</th>
                     <th class="col-stat">Points</th>
                     <th class="col-pos">Position</th>
                 </tr>
@@ -149,7 +161,7 @@
                     </td>
                     @endif
 
-                    <td class="series-cell">{{ $season['series_name'] }}</td>
+                    <td class="series-cell"><a href="{{ route('seasons.show',  $season['season_id'] ) }}">{{ $season['series_name'] }}  </a></td>
                     <td class="team-cell">{{ $season['teams']->implode(', ') }}</td>
                     <td class="stat-cell">{{ $season['stats']->races }}</td>
 
@@ -158,9 +170,10 @@
                         {{ $season['stats']->wins }}
                     </td>
 
-                    <td class="stat-cell">{{ $season['stats']->podiums }}</td>
+                    
                     <td class="stat-cell">{{ $season['stats']->poles }}</td>
                     <td class="stat-cell">{{ $season['stats']->fastest_laps }}</td>
+                    <td class="stat-cell">{{ $season['stats']->podiums }}</td>
                     <td class="stat-cell font-bold">{{ $season['stats']->points }}</td>
 
                     @php
@@ -182,7 +195,103 @@
     </div>
 
     <div style="margin-top:40px;">
-        <h5>Complete {Race Series} results</h5>
+        @foreach($resultsGrid as $seriesName => $seriesData)
+            @php
+                $isMulticlass = $seriesData['is_multiclass'];
+                $isSpec       = $seriesData['is_spec'];
+            @endphp
+
+            <h5>{{ $seriesName }}</h5>
+
+            @foreach($seriesData['seasons'] as $year => $seasonData)
+                @php
+                    $calendar    = $seasonData['calendar'];
+                    $seasonId    = $seasonData['season_id'];
+                    $seasonStats = $careerMap[$year][$seasonId] ?? null;
+                    $champPos    = $seasonStats['position']      ?? '-';
+                    $points      = $seasonStats['stats']->points ?? '-';
+                @endphp
+
+                <div class="career-table-container" style="margin-bottom:16px;">
+                    <table class="career-table">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+
+                                @if($isSpec)
+                                    <th>Team</th>
+                                @else
+                                    <th>Entrant</th>
+                                    @if($isMulticlass)<th>Class</th>@endif
+                                    <th>Chassis / Engine</th>
+                                @endif
+
+                                @foreach($calendar as $round => $roundData)
+                                    @php $sessionCount = max(count($roundData['sessions']), 1); @endphp
+                                    <th @if($sessionCount > 1) colspan="{{ $sessionCount }}" @endif>{{ $round }}</th>
+                                @endforeach
+
+                                <th>Place</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($seasonData['entries'] as $entry)
+                            <tr class="career-row">
+                                <td class="year-cell">{{ $year }}</td>
+
+                                @if($isSpec)
+                                    <td class="team-cell">{{ $entry['entrant'] }}</td>
+                                @else
+                                    <td class="team-cell">{{ $entry['entrant'] }}</td>
+                                    @if($isMulticlass)
+                                        <td class="stat-cell">{{ $entry['class'] }}</td>
+                                    @endif
+                                    <td class="series-cell" style="font-size:11px;white-space:nowrap;">
+                                        {{ $entry['chassis'] }}<br>
+                                        <span class="italic" style="color:#64748b;font-weight:400;">{{ $entry['engine'] }}</span>
+                                    </td>
+                                @endif
+
+                                @foreach($calendar as $round => $roundData)
+                                    @if(count($roundData['sessions']) > 0)
+                                        @foreach($roundData['sessions'] as $session)
+                                            @php
+                                                $result = $entry['results'][$round][$session['session_id']] ?? null;
+                                                $resultClass = '';
+                                                if ($result !== null) {
+                                                    if ($result === '1')                        $resultClass = 'pos-first';
+                                                    elseif ($result === '2')                    $resultClass = 'pos-second';
+                                                    elseif ($result === '3')                    $resultClass = 'pos-third';
+                                                    elseif (is_numeric($result))               $resultClass = 'pos-general';
+                                                    else                                        $resultClass = 'pos-dnf';
+                                                }
+                                            @endphp
+                                            @php $labelClass = $result !== null ? 'result-label-active' : 'result-label-inactive'; @endphp
+                                            <td class="stat-cell {{ $resultClass }}" style="min-width:36px;text-align:center;line-height:1.3;">
+                                                <span class="{{ $labelClass }}" style="display:block;font-size:10px;">{{ $roundData['race_code'] }}</span>
+                                                @if(count($roundData['sessions']) > 1)
+                                                    <span class="{{ $labelClass }} italic" style="display:block;font-size:10px;">{{ $session['is_sprint'] ? 'SPR' : 'FEA' }}</span>
+                                                @endif
+                                                <span style="display:block;">{{ $result ?? '' }}</span>
+                                            </td>
+                                        @endforeach
+                                    @else
+                                        <td class="stat-cell" style="min-width:36px;text-align:center;line-height:1.3;">
+                                            <span style="display:block;font-size:10px;color:#94a3b8;">{{ $roundData['race_code'] }}</span>
+                                        </td>
+                                    @endif
+                                @endforeach
+
+                                <td class="pos-cell">{{ $champPos }}</td>
+                                <td class="stat-cell font-bold">{{ $points }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endforeach
+        @endforeach
     </div>
 </div>
 

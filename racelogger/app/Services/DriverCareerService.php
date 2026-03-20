@@ -7,9 +7,9 @@ use Illuminate\Support\Collection;
 
 class DriverCareerService
 {
-    public function getCareerStructure($driverId): Collection
+    public function getCareerStructure($driverId, int $worldId): Collection
     {
-        $entries = $this->getDriverSeasonEntries($driverId);
+        $entries = $this->getDriverSeasonEntries($driverId, $worldId);
         $standings = $this->calculateChampionshipStandings();
 
         return $entries->groupBy('season_year')
@@ -30,12 +30,13 @@ class DriverCareerService
                         'teams'       => $seasonGroup->unique('entrant_name')->pluck('entrant_name'),
                         'stats'       => $stats,
                         'ordinal'     => $position ? $this->getOrdinalSuffix($position) : '-',
+                        'position'    => $position,
                     ];
                 });
             });
     }
 
-    private function getDriverSeasonEntries($driverId): Collection
+    private function getDriverSeasonEntries($driverId, int $worldId): Collection
     {
         // Assigned drivers
         $assigned = DB::table('entry_car_driver as ecd')
@@ -46,6 +47,7 @@ class DriverCareerService
             ->leftJoin('series as ser', 's.series_id', '=', 'ser.id')
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('ecd.driver_id', $driverId)
+            ->where('ser.world_id', $worldId)
             ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.name as entrant_name']);
 
         // Results drivers (for one-offs/mid-season)
@@ -58,6 +60,7 @@ class DriverCareerService
             ->leftJoin('series as ser', 's.series_id', '=', 'ser.id')
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('rd.driver_id', $driverId)
+            ->where('ser.world_id', $worldId)
             ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.name as entrant_name']);
 
         return $assigned->union($results)->get();
