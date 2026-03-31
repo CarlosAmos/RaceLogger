@@ -93,6 +93,7 @@
         text-align: center;
         background-color: #fdfdfd;
         width: 60px;
+        border: 2px solid #e2e8f0;
     }
 
     .ordinal-text {
@@ -283,7 +284,13 @@
                                     @endif
                                 @endforeach
 
-                                <td class="pos-cell">{{ $champPos }}</td>
+                                @php
+                    $gridPosClass = '';
+                    if ($champPos == 1)      $gridPosClass = 'pos-first';
+                    elseif ($champPos == 2)  $gridPosClass = 'pos-second';
+                    elseif ($champPos == 3)  $gridPosClass = 'pos-third';
+                @endphp
+                <td class="pos-cell {{ $gridPosClass }}">{{ $seasonStats['ordinal'] ?? $champPos }}</td>
                                 <td class="stat-cell font-bold">{{ $points }}</td>
                             </tr>
                             @endforeach

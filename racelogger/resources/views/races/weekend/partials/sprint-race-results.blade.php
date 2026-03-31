@@ -1,4 +1,5 @@
 @php
+    
     $raceCars = $race->entryCars()
         ->with([
             'entryClass.raceClass',
@@ -19,11 +20,14 @@
     })->sortBy('display_order')->values();
     
     $totalPositions = $raceCars->count();
-
-    $savedSprintResults = $sprintRaceSession->results
+    if($sprintRaceSession != null) {
+    
+        $savedSprintResults = $sprintRaceSession->results
         ->sortBy('position')
         ->values()
         ->keyBy('position');
+    }
+
 
     function formatGap2($result) {
         if ($result->gap_laps_down) {
@@ -50,7 +54,7 @@
     </div>
 @endif
 
-<input type="hidden" name="sprint_race_session_id" value="{{ $sprintRaceSession->id }}">
+<input type="hidden" name="sprint_race_session_id" value="{{ $sprintRaceSession != null ? $sprintRaceSession->id : 0  }}">
 
 <div class="table-responsive">
 <table class="table table-bordered table-sm align-middle text-center">

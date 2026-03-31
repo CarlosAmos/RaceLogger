@@ -153,20 +153,23 @@ class DriverCareerService
     private function calculateChampionshipStandings(): Collection
     {
         return collect(DB::select("
-            SELECT season_id, driver_id, rank FROM (
-                SELECT 
-                    cr.season_id, 
+            SELECT season_id, driver_id, race_class_id, rank FROM (
+                SELECT
+                    cr.season_id,
                     rd.driver_id,
+                    ecl.race_class_id,
                     DENSE_RANK() OVER (
-                        PARTITION BY cr.season_id 
-                        ORDER BY SUM(r.points_awarded) DESC, SUM(CASE WHEN r.position = 1 THEN 1 ELSE 0 END) DESC
+                        PARTITION BY cr.season_id, ecl.race_class_id
+                        ORDER BY SUM(r.points_awarded) DESC, SUM(CASE WHEN r.class_position = 1 THEN 1 ELSE 0 END) DESC
                     ) as rank
                 FROM result_drivers rd
-                JOIN results r ON rd.result_id = r.id
-                JOIN race_sessions rs ON r.race_session_id = rs.id
+                JOIN results r         ON rd.result_id = r.id
+                JOIN race_sessions rs  ON r.race_session_id = rs.id
                 JOIN calendar_races cr ON rs.calendar_race_id = cr.id
+                JOIN entry_cars ec     ON r.entry_car_id = ec.id
+                JOIN entry_classes ecl ON ec.entry_class_id = ecl.id
                 WHERE rs.name LIKE '%Race%'
-                GROUP BY cr.season_id, rd.driver_id
+                GROUP BY cr.season_id, rd.driver_id, ecl.race_class_id
             ) as standings
         "));
     }
