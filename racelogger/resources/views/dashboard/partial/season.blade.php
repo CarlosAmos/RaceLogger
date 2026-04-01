@@ -200,43 +200,55 @@
             @php
                 $isMulticlass = $seriesData['is_multiclass'];
                 $isSpec       = $seriesData['is_spec'];
+
+                // Calculate the total session-columns for each season, then find the max
+                $maxCols = 0;
+                foreach ($seriesData['seasons'] as $sd) {
+                    $cols = 0;
+                    foreach ($sd['calendar'] as $rd) {
+                        $cols += max(1, count($rd['sessions']));
+                    }
+                    if ($cols > $maxCols) $maxCols = $cols;
+                }
             @endphp
 
             <h5>{{ $seriesName }}</h5>
 
-            @foreach($seriesData['seasons'] as $year => $seasonData)
-                @php
-                    $calendar    = $seasonData['calendar'];
-                    $seasonId    = $seasonData['season_id'];
-                    $seasonStats = $careerMap[$year][$seasonId] ?? null;
-                    $champPos    = $seasonStats['position']      ?? '-';
-                    $points      = $seasonStats['stats']->points ?? '-';
-                @endphp
+            <div class="career-table-container" style="margin-bottom:16px;">
+                <table class="career-table">
+                    <thead>
+                        <tr>
+                            <th>Year</th>
+                            @if($isSpec)
+                                <th>Team</th>
+                            @else
+                                <th>Entrant</th>
+                                @if($isMulticlass)<th>Class</th>@endif
+                                <th>Chassis / Engine</th>
+                            @endif
+                            @for($i = 1; $i <= $maxCols; $i++)
+                                <th>{{ $i }}</th>
+                            @endfor
+                            <th>Place</th>
+                            <th>Points</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($seriesData['seasons'] as $year => $seasonData)
+                            @php
+                                $calendar    = $seasonData['calendar'];
+                                $seasonId    = $seasonData['season_id'];
+                                $seasonStats = $careerMap[$year][$seasonId] ?? null;
+                                $champPos    = $seasonStats['position']      ?? '-';
+                                $points      = $seasonStats['stats']->points ?? '-';
 
-                <div class="career-table-container" style="margin-bottom:16px;">
-                    <table class="career-table">
-                        <thead>
-                            <tr>
-                                <th>Year</th>
+                                $seasonCols = 0;
+                                foreach ($calendar as $rd) {
+                                    $seasonCols += max(1, count($rd['sessions']));
+                                }
+                                $paddingCols = $maxCols - $seasonCols;
+                            @endphp
 
-                                @if($isSpec)
-                                    <th>Team</th>
-                                @else
-                                    <th>Entrant</th>
-                                    @if($isMulticlass)<th>Class</th>@endif
-                                    <th>Chassis / Engine</th>
-                                @endif
-
-                                @foreach($calendar as $round => $roundData)
-                                    @php $sessionCount = max(count($roundData['sessions']), 1); @endphp
-                                    <th @if($sessionCount > 1) colspan="{{ $sessionCount }}" @endif>{{ $round }}</th>
-                                @endforeach
-
-                                <th>Place</th>
-                                <th>Points</th>
-                            </tr>
-                        </thead>
-                        <tbody>
                             @foreach($seasonData['entries'] as $entry)
                             <tr class="career-row">
                                 <td class="year-cell">{{ $year }}</td>
@@ -261,11 +273,11 @@
                                                 $result = $entry['results'][$round][$session['session_id']] ?? null;
                                                 $resultClass = '';
                                                 if ($result !== null) {
-                                                    if ($result === '1')                        $resultClass = 'pos-first';
-                                                    elseif ($result === '2')                    $resultClass = 'pos-second';
-                                                    elseif ($result === '3')                    $resultClass = 'pos-third';
-                                                    elseif (is_numeric($result))               $resultClass = 'pos-general';
-                                                    else                                        $resultClass = 'pos-dnf';
+                                                    if ($result === '1')             $resultClass = 'pos-first';
+                                                    elseif ($result === '2')         $resultClass = 'pos-second';
+                                                    elseif ($result === '3')         $resultClass = 'pos-third';
+                                                    elseif (is_numeric($result))     $resultClass = 'pos-general';
+                                                    else                             $resultClass = 'pos-dnf';
                                                 }
                                             @endphp
                                             @php $labelClass = $result !== null ? 'result-label-active' : 'result-label-inactive'; @endphp
@@ -284,20 +296,24 @@
                                     @endif
                                 @endforeach
 
+                                @for($p = 0; $p < $paddingCols; $p++)
+                                    <td class="stat-cell"></td>
+                                @endfor
+
                                 @php
-                    $gridPosClass = '';
-                    if ($champPos == 1)      $gridPosClass = 'pos-first';
-                    elseif ($champPos == 2)  $gridPosClass = 'pos-second';
-                    elseif ($champPos == 3)  $gridPosClass = 'pos-third';
-                @endphp
-                <td class="pos-cell {{ $gridPosClass }}">{{ $seasonStats['ordinal'] ?? $champPos }}</td>
+                                    $gridPosClass = '';
+                                    if ($champPos == 1)      $gridPosClass = 'pos-first';
+                                    elseif ($champPos == 2)  $gridPosClass = 'pos-second';
+                                    elseif ($champPos == 3)  $gridPosClass = 'pos-third';
+                                @endphp
+                                <td class="pos-cell {{ $gridPosClass }}">{{ $seasonStats['ordinal'] ?? $champPos }}</td>
                                 <td class="stat-cell font-bold">{{ $points }}</td>
                             </tr>
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endforeach
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         @endforeach
     </div>
 </div>

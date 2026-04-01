@@ -154,34 +154,6 @@
             @php
             $lastYear = "";
             @endphp
-            @foreach($seasons as $season)
-            @php
-
-            if($season->year !== $lastYear) {
-            echo '<div style="width:100%"></div>';
-            $lastYear = $season->year;
-            }
-
-            if($season->year < 1980) continue;
-            @endphp
-            <div style="border:1px solid #ccc; padding:15px; width:220px; background:#fff; margin:5px;">
-
-                <h4>{{ $season->series->name }} - {{ $season->year }}</h4>
-
-                <div style="margin-top:10px;">
-                    <a href="{{ route('seasons.show', $season->id) }}">
-                        <button>Open Season</button>
-                    </a>
-
-                    @if(!isset($season->is_complete) || $season->is_complete === 0)
-                    <a href="{{ route('seasons.edit', $season->id, $world) }}">
-                        <button>Edit</button>
-                    </a>
-                    @endif
-                </div>
-
-            </div>
-            @endforeach
         </div>
         <div style="display:flex; width:100%; margin-top:20px; margin-left:10px;">
             @include('dashboard.partial.season')
