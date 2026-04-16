@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Series;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class SeriesController extends Controller
 {
@@ -15,17 +16,17 @@ class SeriesController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        return view('series.index', compact('series'));
+        return Inertia::render('series/index', ['series' => $series]);
     }
 
     public function create()
     {
-        return view('series.create');
+        return Inertia::render('series/create');
     }
 
     public function created(Series $series)
     {
-        return view('series.created', compact('series'));
+        return Inertia::render('series/created', ['series' => $series]);
     }
 
     public function store(Request $request)

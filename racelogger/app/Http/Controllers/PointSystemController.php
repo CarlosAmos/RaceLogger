@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\PointSystem;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class PointSystemController extends Controller
 {
-    public function create()
+    public function create(Request $request)
     {
-        return view('point-systems.create');
+        return Inertia::render('point-systems/create', [
+            'seasonId' => $request->query('season_id'),
+        ]);
     }
 
     public function store(Request $request)

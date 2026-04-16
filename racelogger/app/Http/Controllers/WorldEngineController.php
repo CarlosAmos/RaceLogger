@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\World;
+use Inertia\Inertia;
 
 class WorldEngineController extends Controller
 {
@@ -16,7 +17,7 @@ class WorldEngineController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('engines.index', compact('world', 'engines'));
+        return Inertia::render('engines/index', compact('world', 'engines'));
     }
 
     /**
@@ -24,7 +25,7 @@ class WorldEngineController extends Controller
      */
     public function create(World $world)
     {
-        return view('engines.create', compact('world'));
+        return Inertia::render('engines/create', compact('world'));
     }
 
     /**

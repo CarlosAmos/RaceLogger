@@ -9,6 +9,7 @@ use App\Models\EntryClass;
 use App\Models\EntryCar;
 use App\Models\Driver;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class EntryCarDriverController extends Controller
 {
@@ -45,7 +46,7 @@ class EntryCarDriverController extends Controller
             ->unique()
             ->toArray();
 
-        return view('entry-car-drivers.edit', compact(
+        return Inertia::render('entry-car-drivers/edit', compact(
             'world',
             'season',
             'seasonEntry',

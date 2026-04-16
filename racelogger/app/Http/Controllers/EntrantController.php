@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\World;
 use App\Models\Country;
+use Inertia\Inertia;
 
 class EntrantController extends Controller
 {
@@ -23,10 +24,7 @@ class EntrantController extends Controller
     {
         $countries = Country::orderBy('name')->get();
 
-        return view('entrants.create', compact(
-            'world',
-            'countries'
-        ));
+        return Inertia::render('entrants/create', compact('world', 'countries'));
     }
 
     /**

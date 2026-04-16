@@ -12,6 +12,7 @@ use App\Models\ResultDriver;
 use App\Services\DriverCareerService;
 use App\Services\CareerResultsGridService;
 use Carbon\Carbon;
+use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
@@ -42,7 +43,13 @@ class DashboardController extends Controller
             ->orderBy('race_date', 'asc')
             ->get();
 
-        $myId = 194; // My Id
+        if($worldId == 2) {
+            $myId = 194; // My Id
+        } else if($worldId == 3) {
+            $myId = 1569;
+        }
+        
+        
         // $myId = 186;
         // $myId = 161;
         //$results = $this->getDriverSeasonResults($myId, $worldId);
@@ -50,7 +57,7 @@ class DashboardController extends Controller
         $resultsGrid = $gridService->getResultsGrid($myId, $worldId);
 
         //dd($careerMap);
-        return view('dashboard.index', compact(
+        return Inertia::render('dashboard', compact(
             'world',
             'currentYear',
             'seasons',

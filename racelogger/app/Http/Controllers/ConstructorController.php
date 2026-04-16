@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\World;
 use App\Models\Country;
+use App\Models\Team;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ConstructorController extends Controller
 {
@@ -14,20 +16,25 @@ class ConstructorController extends Controller
     public function index(World $world)
     {
         $constructors = $world->constructors()
-        ->with('country')
-        ->orderBy('name')
-        ->get();
+            ->with('country')
+            ->orderBy('name')
+            ->get();
 
-            $entrants = $world->entrants()
-                ->with(['country'])
-                ->orderBy('name')
-                ->get();
+        $entrants = $world->entrants()
+            ->with('country')
+            ->orderBy('name')
+            ->get();
 
-            return view('constructors.index', compact(
-                'world',
-                'constructors',
-                'entrants'
-            ));
+        $teams = $world->teams()
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('constructors/index', [
+            'world' => $world,
+            'constructors' => $constructors,
+            'entrants' => $entrants,
+            'teams' => $teams,
+        ]);
     }
 
     /**
@@ -37,7 +44,7 @@ class ConstructorController extends Controller
     {
         $countries = Country::orderBy('name')->get();
 
-        return view('constructors.create', compact('world', 'countries'));
+        return Inertia::render('constructors/create', compact('world', 'countries'));
 
     }
 

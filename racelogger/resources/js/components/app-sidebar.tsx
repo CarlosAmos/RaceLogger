@@ -1,8 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { CalendarDays, Car, Flag, LayoutGrid, List, MapPin, Trophy, Globe } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
     SidebarContent,
@@ -15,36 +14,67 @@ import {
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
 import { dashboard } from '@/routes';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
+import worlds from '@/routes/worlds';
+import series from '@/routes/series';
+import seasons from '@/routes/seasons';
+import tracks from '@/routes/tracks';
+import records from '@/routes/records';
+import teams from '@/routes/teams';
 
 export function AppSidebar() {
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard().url,
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Worlds',
+            href: worlds.index().url,
+            icon: Globe,
+        },
+        {
+            title: 'Series',
+            href: series.index().url,
+            icon: List,
+        },
+        {
+            title: 'Seasons',
+            href: seasons.index().url,
+            icon: CalendarDays,
+        },
+        {
+            title: 'Tracks',
+            href: tracks.index().url,
+            icon: MapPin,
+        },
+        {
+            title: 'Teams',
+            href: teams.index().url,
+            icon: Car,
+        },
+        {
+            title: 'Records',
+            href: records.index().url,
+            icon: Trophy,
+        },
+    ];
+
+    const footerNavItems: NavItem[] = [
+        {
+            title: 'Select World',
+            href: '/',
+            icon: Flag,
+        },
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={dashboard().url} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -58,7 +88,6 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
             </SidebarFooter>
         </Sidebar>
     );

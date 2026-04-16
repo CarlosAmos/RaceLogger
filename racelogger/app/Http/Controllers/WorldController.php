@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\World;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class WorldController extends Controller
 {
@@ -12,13 +13,13 @@ class WorldController extends Controller
     {
         $worlds = World::orderBy('created_at', 'desc')->get();
 
-        return view('worlds.index', compact('worlds'));
+        return Inertia::render('worlds/index', ['worlds' => $worlds]);
     }
 
     // Create Form
     public function create()
     {
-        return view('worlds.create');
+        return Inertia::render('worlds/create');
     }
 
     // Store New World
@@ -45,7 +46,7 @@ class WorldController extends Controller
     // After Creation Page
     public function created(World $world)
     {
-        return view('worlds.created', compact('world'));
+        return Inertia::render('worlds/created', ['world' => $world]);
     }
 
     // Select Existing World

@@ -9,6 +9,7 @@ use App\Models\EntryClass;
 use App\Models\EntryCar;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class EntryCarController extends Controller
 {
@@ -26,7 +27,7 @@ class EntryCarController extends Controller
             ->orderBy('car_number')
             ->get();
 
-        return view('entry-cars.index', compact(
+        return Inertia::render('entry-cars/index', compact(
             'world',
             'season',
             'seasonEntry',
@@ -50,7 +51,7 @@ class EntryCarController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('entry-cars.create', compact(
+        return Inertia::render('entry-cars/create', compact(
             'world',
             'season',
             'seasonEntry',
@@ -138,7 +139,7 @@ class EntryCarController extends Controller
 
         //$entryClass->entryCars()->create($validated);
 
-        return view('entry-cars.create_entry',compact(
+        return Inertia::render('entry-cars/create-entry', compact(
             'world',
             'season',
             'seasonEntry',

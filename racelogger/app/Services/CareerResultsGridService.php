@@ -177,15 +177,22 @@ class CareerResultsGridService
                 }
                 ksort($calendar);
 
+                // Map round_number → 0-based calendar index so results align with array_values($calendar).
+                // $calendar is already ksorted, so array_keys gives rounds in order.
+                $roundToIndex = array_flip(array_keys($calendar));
+
                 // Build per-entry data (one entry per entry_class / car stint)
                 $entries = [];
                 foreach ($seasonResults->groupBy('entry_class_id') as $entryResults) {
                     $ef = $entryResults->first();
 
-                    // result map: round_number → session_id → display string
+                    // result map: calendar_index → session_id → display string
                     $resultMap = [];
                     foreach ($entryResults as $res) {
-                        $resultMap[$res->round_number][$res->session_id] = $this->formatResult($res);
+                        $calIdx = $roundToIndex[$res->round_number] ?? null;
+                        if ($calIdx !== null) {
+                            $resultMap[$calIdx][$res->session_id] = $this->formatResult($res);
+                        }
                     }
 
                     $entries[] = [
@@ -200,7 +207,7 @@ class CareerResultsGridService
                 $seasons[$seasonFirst->season_year] = [
                     'season_id' => (int) $seasonId,
                     'year'      => $seasonFirst->season_year,
-                    'calendar'  => $calendar,
+                    'calendar'  => array_values($calendar),
                     'entries'   => $entries,
                 ];
             }

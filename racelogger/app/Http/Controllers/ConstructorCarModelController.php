@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Constructor;
 use App\Models\CarModel;
 use App\Models\World;
+use Inertia\Inertia;
 
 class ConstructorCarModelController extends Controller
 {
@@ -20,7 +21,7 @@ class ConstructorCarModelController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('car-models.index', compact('world', 'constructor', 'carModels'));
+        return Inertia::render('car-models/index', compact('world', 'constructor', 'carModels'));
     }
 
     /**
@@ -32,7 +33,7 @@ class ConstructorCarModelController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('car-models.create', compact('world', 'constructor', 'engines'));
+        return Inertia::render('car-models/create', compact('world', 'constructor', 'engines'));
     }
     /**
      * Store a newly created resource in storage.

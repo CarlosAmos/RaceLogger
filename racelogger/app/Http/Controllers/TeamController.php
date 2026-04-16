@@ -5,33 +5,47 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Team;
 use App\Models\World;
+use Inertia\Inertia;
 
 class TeamController extends Controller
 {
     public function index()
     {
-        $teams = Team::with('world')->paginate(15);
-        return view('teams.index', compact('teams'));
+        $worldId = session('active_world_id');
+
+        if (!$worldId) {
+            return redirect()->route('world.select');
+        }
+
+        $world = World::findOrFail($worldId);
+
+        return redirect()->route('worlds.constructors.index', $world);
     }
 
     public function create()
     {
-        $worlds = World::all();
-        return view('teams.create', compact('worlds'));
+        $worldId = session('active_world_id');
+        $world = World::findOrFail($worldId);
+
+        return Inertia::render('teams/create', [
+            'world' => $world,
+        ]);
     }
 
     public function store(Request $request)
     {
+        $worldId = session('active_world_id');
+        $world = World::findOrFail($worldId);
+
         $validated = $request->validate([
-            'world_id' => 'required|exists:worlds,id',
             'name' => 'required|max:255',
             'base_country' => 'nullable|max:255',
             'active' => 'boolean',
         ]);
 
-        Team::create($validated);
+        $world->teams()->create($validated);
 
-        return redirect()->route('teams.index')
+        return redirect()->route('worlds.constructors.index', $world)
             ->with('success', 'Team created.');
     }
 

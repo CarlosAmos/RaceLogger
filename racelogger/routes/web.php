@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 use App\Http\Controllers\WorldController;
 use App\Http\Controllers\SeriesController;
 use App\Http\Controllers\SeasonController;
@@ -27,19 +26,6 @@ use App\Http\Controllers\EntryCarDriverController;
 use App\Http\Controllers\PointSystemController;
 use App\Http\Controllers\RaceWeekendController;
 use App\Http\Controllers\LapRecordController;
-
-
-Route::get('/', function () {
-    return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
-})->name('home');
-
-Route::get('dashboard', function () {
-    return Inertia::render('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-require __DIR__.'/settings.php';
 
 
 Route::resource('worlds', WorldController::class);
@@ -81,16 +67,6 @@ Route::resource(
     'worlds.seasons.season-entries',
     SeasonEntryController::class
 );
-
-Route::post(
-    'worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes',
-    [EntryClassController::class, 'store']
-)->name('worlds.seasons.season-entries.entry-classes.store');
-
-Route::delete(
-    'worlds/{world}/seasons/{season}/season-entries/{seasonEntry}/entry-classes/{entryClass}',
-    [EntryClassController::class, 'destroy']
-)->name('worlds.seasons.season-entries.entry-classes.destroy');
 
 Route::resource(
     'worlds.constructors.car-models',

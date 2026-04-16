@@ -6,21 +6,22 @@ use Illuminate\Http\Request;
 
 use App\Models\Track;
 use App\Models\Country;
+use Inertia\Inertia;
 
 class TrackController extends Controller
 {
     public function index()
     {
-        $tracks = Track::with('layouts')->get();
+        $tracks = Track::with(['layouts', 'country'])->get();
 
-        return view('tracks.index', compact('tracks'));
+        return Inertia::render('tracks/index', ['tracks' => $tracks]);
     }
 
     public function create()
     {
         $countries = Country::orderBy('name')->get();
 
-        return view('tracks.form', [
+        return Inertia::render('tracks/form', [
             'track' => new Track(),
             'countries' => $countries,
             'mode' => 'create'
@@ -44,8 +45,9 @@ class TrackController extends Controller
     public function edit(Track $track)
     {
         $countries = Country::orderBy('name')->get();
+        $track->load('layouts');
 
-        return view('tracks.form', [
+        return Inertia::render('tracks/form', [
             'track' => $track,
             'countries' => $countries,
             'mode' => 'edit'

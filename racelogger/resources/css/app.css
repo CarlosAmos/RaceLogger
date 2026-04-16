@@ -140,6 +140,37 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    select option {
+        color: black;
+    }
+
+    select option:disabled {
+        color: #9ca3af;
+    }
+
+    .dark select option {
+        color: white;
+    }
+
+    .dark select option:disabled {
+        color: #6b7280;
+    }
+
+    select:not(.bg-background) {
+        background-color: black !important;
+        color: white !important;
+    }
+
+    select:not(.bg-background) option {
+        background-color: black;
+        color: white;
+    }
+
+    select:not(.bg-background) option:disabled {
+        background-color: black;
+        color: #6b7280;
+    }
 }
 
 /* ========================= */

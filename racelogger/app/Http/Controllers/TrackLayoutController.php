@@ -5,15 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Track;
 use App\Models\TrackLayout;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class TrackLayoutController extends Controller
 {
     public function create(Request $request)
     {
         $track = Track::findOrFail($request->track_id);
+        $layout = new TrackLayout(['track_id' => $track->id]);
 
-        return view('track_layouts.form', [
-            'layout' => new TrackLayout(),
+        return Inertia::render('track-layouts/form', [
+            'layout' => $layout,
             'track' => $track,
             'mode' => 'create'
         ]);
@@ -37,7 +39,7 @@ class TrackLayoutController extends Controller
 
     public function edit(TrackLayout $track_layout)
     {
-        return view('track_layouts.form', [
+        return Inertia::render('track-layouts/form', [
             'layout' => $track_layout,
             'track' => $track_layout->track,
             'mode' => 'edit'

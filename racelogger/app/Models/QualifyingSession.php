@@ -10,6 +10,7 @@ class QualifyingSession extends Model
         'calendar_race_id',
         'name',
         'session_order',
+        'race_number',
         'is_elimination',
         'final_target',
     ];

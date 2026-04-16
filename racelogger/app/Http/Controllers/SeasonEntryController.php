@@ -7,6 +7,7 @@ use App\Models\Constructor;
 use App\Models\Entrant;
 use App\Models\Season;
 use App\Models\World;
+use Inertia\Inertia;
 
 class SeasonEntryController extends Controller
 {
@@ -32,7 +33,7 @@ class SeasonEntryController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('season_entries.create', compact(
+        return Inertia::render('season-entries/create', compact(
             'world',
             'season',
             'entrants',

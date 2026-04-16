@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\World;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -35,13 +36,16 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $activeWorld = null;
+        if (session()->has('active_world_id')) {
+            $activeWorld = World::find(session('active_world_id'));
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'auth' => [
-                'user' => $request->user(),
-            ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'activeWorld' => $activeWorld,
         ];
     }
 }

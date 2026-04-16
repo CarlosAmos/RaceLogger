@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\RecordComputeService;
+use Inertia\Inertia;
 
 class LapRecordController extends Controller
 {
@@ -11,6 +12,6 @@ class LapRecordController extends Controller
         $worldId = session('active_world_id');
         $records = $service->compute($worldId);
 
-        return view('lap-records.index', compact('records'));
+        return Inertia::render('lap-records/index', compact('records'));
     }
 }

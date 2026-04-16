@@ -12,13 +12,38 @@ use App\Models\SeasonClass;
 use App\Models\PointSystem;
 use Illuminate\Support\Facades\DB;
 use App\Services\ChampionshipScenarioService;
+use Inertia\Inertia;
 
 class SeasonController extends Controller
 {
     public function index()
     {
-        $seasons = Season::with('series.world')->paginate(15);
-        return view('seasons.index', compact('seasons'));
+        $worldId = session('active_world_id');
+        $world   = World::findOrFail($worldId);
+
+        $seasons = Season::with(['series', 'calendarRaces', 'seasonClasses'])
+            ->whereHas('series', fn ($q) => $q->where('world_id', $worldId))
+            ->orderByDesc('year')
+            ->get()
+            ->groupBy('series_id')
+            ->map(fn ($group) => [
+                'series' => [
+                    'id'   => $group->first()->series->id,
+                    'name' => $group->first()->series->name,
+                ],
+                'seasons' => $group->map(fn ($s) => [
+                    'id'           => $s->id,
+                    'year'         => $s->year,
+                    'round_count'  => $s->calendarRaces->count(),
+                    'class_count'  => $s->seasonClasses->count(),
+                ])->values(),
+            ])
+            ->values();
+
+        return Inertia::render('seasons/index', [
+            'world'   => ['id' => $world->id, 'name' => $world->name],
+            'seasons' => $seasons,
+        ]);
     }
 
     public function create(Request $request)
@@ -45,7 +70,7 @@ class SeasonController extends Controller
 
         $pointSystems = PointSystem::with(['rules','bonusRules'])->get();
 
-        return view('seasons.form', [
+        return Inertia::render('seasons/create', [
             'season' => new Season(),
             'series' => $series,
             'seriesId' => $seriesId,
@@ -53,7 +78,8 @@ class SeasonController extends Controller
             'layouts' => $layouts,
             'mode' => 'create',
             'worlds' => $world,
-            'pointSystems' => $pointSystems
+            'pointSystems' => $pointSystems,
+            'tab' => 'circuits',
         ]);
     }
 
@@ -71,6 +97,8 @@ class SeasonController extends Controller
             'circuits.*.race_code' => ['required','string','size:3','alpha'],
             'circuits.*.race_date' => 'required|date',
             'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
+            'circuits.*.number_of_races' => 'nullable|integer|min:1|max:99',
+            'circuits.*.endurance' => 'nullable|integer|min:0|max:1',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
@@ -81,9 +109,9 @@ class SeasonController extends Controller
             ->map(fn($code) => strtoupper($code));
 
         if ($raceCodes->count() !== $raceCodes->unique()->count()) {
-            return back()
-                ->withErrors(['circuits' => 'Race codes must be unique within the season.'])
-                ->withInput();
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'circuits' => 'Race codes must be unique within the season.',
+            ]);
         }
 
         try {
@@ -125,6 +153,8 @@ class SeasonController extends Controller
                     'race_code' => strtoupper($race['race_code']),
                     'race_date' => $race['race_date'],
                     'point_system_id' => $race['point_system_id'] ?? null,
+                    'number_of_races' => $race['number_of_races'] ?? 1,
+                    'endurance' => $race['endurance'] ?? 0,
                 ]);
             }
 
@@ -155,8 +185,9 @@ class SeasonController extends Controller
             'seasonEntries.entryClasses.entryCars.carModel.engine',
             'seasonEntries.entryClasses.entryCars.carModel.constructor',
             'seasonEntries.entryClasses.entryCars.drivers.country',
-            'calendarRaces.results',
-            'calendarRaces.raceSessions'
+            'calendarRaces.results.resultDrivers.driver',
+            'calendarRaces.raceSessions',
+            'calendarRaces.qualifyingSessions.results',
         ]);
         
         $scenarioService = new ChampionshipScenarioService();
@@ -177,8 +208,7 @@ class SeasonController extends Controller
 
         $series = Series::where('id', $season->series_id)->get();
 
-        //dd($series[0]);
-        return view('seasons.show', compact(
+        return Inertia::render('seasons/show', compact(
             'world',
             'season',
             'series',
@@ -223,7 +253,7 @@ class SeasonController extends Controller
             'calendarRaces.layout.track.country'
         ]);
 
-        return view('seasons.form', [
+        return Inertia::render('seasons/edit', [
             'season' => $season,
             'series' => $series,
             'seriesId' => $season->series_id,
@@ -233,7 +263,7 @@ class SeasonController extends Controller
             'mode' => 'edit',
             'worlds' => $world,
             'pointSystems' => $pointSystems,
-            'tab' => $tab
+            'tab' => $tab,
         ]);
     }
 
@@ -253,19 +283,21 @@ class SeasonController extends Controller
             'circuits.*.race_date' => 'required|date',
             'circuits.*.sprint_race' => 'required|integer|min:0|max:1',
             'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
+            'circuits.*.number_of_races' => 'nullable|integer|min:1|max:99',
+            'circuits.*.endurance' => 'nullable|integer|min:0|max:1',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
-        ]); 
-        
+        ]);
+
         $raceCodes = collect($request->circuits)
             ->pluck('race_code')
             ->map(fn($code) => strtoupper($code));
 
         if ($raceCodes->count() !== $raceCodes->unique()->count()) {
-            return back()
-                ->withErrors(['circuits' => 'Race codes must be unique within the season.'])
-                ->withInput();
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'circuits' => 'Race codes must be unique within the season.',
+            ]);
         }
 
         try {
@@ -278,9 +310,9 @@ class SeasonController extends Controller
 
             if ($hasResults) {
                 DB::rollBack();
-                return back()
-                    ->withErrors(['season' => 'Calendar cannot be modified because results already exist.'])
-                    ->withInput();
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'season' => 'Calendar cannot be modified because results already exist.',
+                ]);
             }
 
             // Update season (WITH default point system)
@@ -345,6 +377,8 @@ class SeasonController extends Controller
                     'race_date' => $race['race_date'],
                     'sprint_race' => $race['sprint_race'],
                     'point_system_id' => $race['point_system_id'] ?? null,
+                    'number_of_races' => $race['number_of_races'] ?? 1,
+                    'endurance' => $race['endurance'] ?? 0,
                 ]);
             }
 
