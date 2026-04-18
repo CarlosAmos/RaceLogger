@@ -41,6 +41,7 @@ interface QualifyingResult {
 interface QualifyingSession {
     id: number;
     session_order: number;
+    race_number: number;
     results: QualifyingResult[];
 }
 
@@ -55,6 +56,7 @@ interface CalendarRace {
     round_number: number;
     race_code: string;
     sprint_race: number;
+    endurance: number;
     results: Result[];
     race_sessions: RaceSession[];
     qualifying_sessions: QualifyingSession[];
@@ -63,6 +65,7 @@ interface CalendarRace {
 interface EntryCar {
     id: number;
     car_number: string;
+    livery_name: string | null;
     car_model: { name: string; year: number; hybrid?: boolean; engine?: { name: string } | null } | null;
     drivers: Driver[];
 }
@@ -209,7 +212,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                         classId: ec.race_class_id,
                         className: ec.race_class.name,
                         carNumber: car.car_number,
-                        teamName: entry.entrant?.name ?? '',
+                        teamName: car.livery_name ?? entry.display_name ?? entry.entrant?.name ?? '',
                         teamId: entry.entrant?.id ?? 0,
                         entryId: entry.id,
                     });
@@ -219,8 +222,8 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
         return map;
     }, [season.season_entries]);
 
-    // Build class standings tables
-    const classTables = useMemo(() => {
+    // Helper: build class standings tables from a given race array
+    const buildClassTablesFromRaces = (raceList: CalendarRace[]) => {
         const tables = new Map<number, {
             id: number;
             name: string;
@@ -230,7 +233,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                 driver: Driver;
                 teamName: string;
                 carNumber: string;
-                raceResults: Map<number, Result>; // keyed by race_session_id
+                raceResults: Map<number, Result>;
                 totalPoints: number;
             }>;
         }>();
@@ -244,7 +247,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
             });
         }
 
-        for (const race of season.calendar_races) {
+        for (const race of raceList) {
             for (const result of race.results) {
                 const carInfo = entryCarMap.get(result.entry_car_id);
                 if (!carInfo) continue;
@@ -276,13 +279,569 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
 
         return Array.from(tables.values())
             .sort((a, b) => a.displayOrder - b.displayOrder);
-    }, [season, entryCarMap]);
+    };
 
-    // Sorted races
+    // Build class standings tables (all races)
+    const classTables = useMemo(
+        () => buildClassTablesFromRaces(season.calendar_races),
+        [season, entryCarMap]
+    );
+
+    // Sorted races (all)
     const sortedRaces = useMemo(
         () => [...season.calendar_races].sort((a, b) => a.round_number - b.round_number),
         [season.calendar_races]
     );
+
+    // Detect mix of endurance and non-endurance races
+    const hasEnduranceMix = useMemo(
+        () => sortedRaces.some(r => r.endurance) && sortedRaces.some(r => !r.endurance),
+        [sortedRaces]
+    );
+
+    const enduranceSortedRaces = useMemo(
+        () => sortedRaces.filter(r => r.endurance),
+        [sortedRaces]
+    );
+
+    const regularSortedRaces = useMemo(
+        () => sortedRaces.filter(r => !r.endurance),
+        [sortedRaces]
+    );
+
+    const enduranceClassTables = useMemo(
+        () => hasEnduranceMix ? buildClassTablesFromRaces(enduranceSortedRaces) : [],
+        [hasEnduranceMix, enduranceSortedRaces, entryCarMap]
+    );
+
+    const regularClassTables = useMemo(
+        () => hasEnduranceMix ? buildClassTablesFromRaces(regularSortedRaces) : [],
+        [hasEnduranceMix, regularSortedRaces, entryCarMap]
+    );
+
+    // ─── Render: driver championship standings ─────────────────────────────────
+    const renderDriverStandings = (classTbls: ReturnType<typeof buildClassTablesFromRaces>, raceList: CalendarRace[], keyPrefix = '') => {
+        return classTbls.map((cls) => {
+            const hiddenPtsMap = new Map<number, number>();
+            for (const row of cls.rows.values()) {
+                if (row.totalPoints > 0) continue;
+                let hidden = 0;
+                for (const race of raceList) {
+                    for (const session of race.race_sessions) {
+                        const classCompetitors = race.results.filter(r =>
+                            r.race_session_id === session.id &&
+                            entryCarMap.get(r.entry_car_id)?.classId === cls.id
+                        ).length;
+                        if (classCompetitors === 0) continue;
+                        const result = row.raceResults.get(session.id);
+                        if (!result) {
+                            hidden += classCompetitors + 1;
+                        } else if (result.status === 'finished') {
+                            hidden += Number(result.class_position ?? classCompetitors + 1);
+                        } else {
+                            hidden += classCompetitors;
+                        }
+                    }
+                }
+                hiddenPtsMap.set(row.driverId, hidden);
+            }
+
+            const sortedRows = Array.from(cls.rows.values()).sort((a, b) => {
+                if (a.totalPoints > 0 && b.totalPoints > 0)
+                    return b.totalPoints - a.totalPoints || a.teamName.localeCompare(b.teamName);
+                if (a.totalPoints > 0) return -1;
+                if (b.totalPoints > 0) return 1;
+                const ha = hiddenPtsMap.get(a.driverId) ?? 0;
+                const hb = hiddenPtsMap.get(b.driverId) ?? 0;
+                return ha - hb || a.teamName.localeCompare(b.teamName);
+            });
+            const leaderPts = sortedRows[0]?.totalPoints ?? 0;
+
+            const driverRankMap = new Map<number, number>();
+            let dRank = 0, prevDriverKey = '';
+            for (const row of sortedRows) {
+                const key = row.totalPoints > 0
+                    ? `pts:${row.teamName}:${row.totalPoints}`
+                    : `npts:${row.teamName}:${hiddenPtsMap.get(row.driverId) ?? 0}`;
+                if (key !== prevDriverKey) { dRank++; prevDriverKey = key; }
+                driverRankMap.set(row.driverId, dRank);
+            }
+            const driverRank = (id: number) => driverRankMap.get(id) ?? 0;
+
+            return (
+                <div key={`${keyPrefix}driver-${cls.id}`}>
+                    <h4 className="mb-2 uppercase font-bold border-b border-border pb-1">
+                        {cls.name}
+                    </h4>
+                    <div className="overflow-x-auto">
+                        <table className="text-sm text-center w-full border-collapse">
+                            <thead>
+                                <tr>
+                                    <th className="border border-border px-2 py-1">Pos</th>
+                                    <th className="border border-border px-2 py-1 text-left">Driver</th>
+                                    <th className="border border-border px-2 py-1">No.</th>
+                                    <th className="border border-border px-2 py-1 text-left">Team</th>
+                                    {raceList.map((race) =>
+                                        race.race_sessions.length > 0
+                                            ? race.race_sessions.map((session) => (
+                                                <th key={session.id} className="border border-border px-2 py-1">
+                                                    <Link
+                                                        href={races.show(race.id, {
+                                                            query: { has_sprint: race.sprint_race },
+                                                        }).url}
+                                                        className="hover:underline"
+                                                    >
+                                                        {session.is_sprint
+                                                            ? `${race.race_code}S`
+                                                            : race.race_sessions.filter(s => !s.is_sprint).length > 1
+                                                                ? `${race.race_code} R${session.session_order}${race.endurance ? ' (E)' : ''}`
+                                                                : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
+                                                    </Link>
+                                                </th>
+                                            ))
+                                            : [
+                                                <th key={race.id} className="border border-border px-2 py-1">
+                                                    <Link
+                                                        href={races.show(race.id, {
+                                                            query: { has_sprint: race.sprint_race },
+                                                        }).url}
+                                                        className="hover:underline"
+                                                    >
+                                                        {`${race.race_code}${race.endurance ? ' (E)' : ''}`}
+                                                    </Link>
+                                                </th>
+                                            ]
+                                    )}
+                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
+                                    <th className="border border-border px-2 py-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedRows.map((row, idx) => {
+                                    const displayPos = driverRank(row.driverId);
+                                    return (
+                                    <tr key={row.driverId}>
+                                        <td className="border border-border px-2 py-1">{displayPos}</td>
+                                        <td className="border border-border px-2 py-1 text-left whitespace-nowrap">
+                                            {row.driver.first_name} {row.driver.last_name}
+                                        </td>
+                                        <td className="border border-border px-2 py-1">#{row.carNumber}</td>
+                                        <td className="border border-border px-2 py-1 text-left text-muted-foreground whitespace-nowrap">
+                                            {row.teamName}
+                                        </td>
+                                        {raceList.map((race) =>
+                                            race.race_sessions.length > 0
+                                                ? race.race_sessions.map((session) => {
+                                                    const result = row.raceResults.get(session.id);
+                                                    const pBadge = (() => {
+                                                        if (!result) return false;
+                                                        const raceNum = session.is_sprint ? 1 : session.session_order;
+                                                        const finalQS = [...(race.qualifying_sessions ?? [])]
+                                                            .filter(qs => qs.race_number === raceNum)
+                                                            .sort((a, b) => b.session_order - a.session_order)[0];
+                                                        if (!finalQS) return false;
+                                                        const classPole = finalQS.results
+                                                            .filter((qr) => {
+                                                                const ci = entryCarMap.get(qr.entry_car_id);
+                                                                return ci?.classId === cls.id;
+                                                            })
+                                                            .sort((a, b) => a.position - b.position)[0];
+                                                        return classPole?.entry_car_id === result.entry_car_id;
+                                                    })();
+                                                    return (
+                                                        <td
+                                                            key={session.id}
+                                                            className={`px-2 py-1 text-center ${resultCellClass(result)}`}
+                                                        >
+                                                            {resultCellText(result)}
+                                                            {pBadge && (
+                                                                <sup className="ml-0.5 text-xs font-bold">P</sup>
+                                                            )}
+                                                            {result?.fastest_lap && (
+                                                                <sup className="ml-0.5 text-xs font-bold text-purple-600">FL</sup>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })
+                                                : [<td key={race.id} className="border border-border px-2 py-1" />]
+                                        )}
+                                        <td className="border border-border px-2 py-1 font-bold">
+                                            {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
+                                        </td>
+                                        <td className="border border-border px-2 py-1 text-muted-foreground text-xs">
+                                            {row.totalPoints > 0 && idx > 0 && `${(row.totalPoints - leaderPts).toFixed(0)}`}
+                                        </td>
+                                    </tr>
+                                    );
+                                })}
+
+                                {/* Pole Position row */}
+                                <tr className="bg-muted/50 font-semibold">
+                                    <td className="border border-border px-2 py-1 text-left" colSpan={4}>
+                                        Pole Position
+                                    </td>
+                                    {raceList.map((race) =>
+                                        race.race_sessions.length > 0
+                                            ? race.race_sessions.map((session) => {
+                                                const raceNum = session.is_sprint ? 1 : session.session_order;
+                                                const finalQS = [...(race.qualifying_sessions ?? [])]
+                                                    .filter(qs => qs.race_number === raceNum)
+                                                    .sort((a, b) => b.session_order - a.session_order)[0];
+                                                const pole = finalQS?.results
+                                                    .filter((qr) => {
+                                                        const ci = entryCarMap.get(qr.entry_car_id);
+                                                        return ci?.classId === cls.id;
+                                                    })
+                                                    .sort((a, b) => a.position - b.position)[0];
+                                                const carInfo = pole
+                                                    ? entryCarMap.get(pole.entry_car_id)
+                                                    : undefined;
+                                                return (
+                                                    <td
+                                                        key={session.id}
+                                                        className="border border-border px-2 py-1 text-center text-xs"
+                                                    >
+                                                        {carInfo ? (
+                                                            <>
+                                                                <div>#{carInfo.carNumber}</div>
+                                                                <div className="text-muted-foreground">
+                                                                    {msToLap(pole?.best_lap_time_ms ?? null)}
+                                                                </div>
+                                                            </>
+                                                        ) : '–'}
+                                                    </td>
+                                                );
+                                            })
+                                            : [<td key={race.id} className="border border-border px-2 py-1 text-center text-xs">–</td>]
+                                    )}
+                                    <td className="border border-border px-2 py-1" colSpan={2} />
+                                </tr>
+
+                                {/* Fastest Lap row */}
+                                <tr className="bg-muted/50 font-semibold">
+                                    <td className="border border-border px-2 py-1 text-left" colSpan={4}>
+                                        Fastest Lap
+                                    </td>
+                                    {raceList.map((race) =>
+                                        race.race_sessions.length > 0
+                                            ? race.race_sessions.map((session) => {
+                                                const fastest = race.results.find(
+                                                    (r) =>
+                                                        r.race_session_id === session.id &&
+                                                        r.fastest_lap &&
+                                                        entryCarMap.get(r.entry_car_id)?.classId === cls.id
+                                                );
+                                                const carInfo = fastest
+                                                    ? entryCarMap.get(fastest.entry_car_id)
+                                                    : undefined;
+                                                return (
+                                                    <td
+                                                        key={session.id}
+                                                        className="border border-border px-2 py-1 text-center text-xs"
+                                                    >
+                                                        {carInfo ? (
+                                                            <>
+                                                                <div>#{carInfo.carNumber}</div>
+                                                                <div className="text-muted-foreground">
+                                                                    {msToLap(fastest?.fastest_lap_time_ms ?? null)}
+                                                                </div>
+                                                            </>
+                                                        ) : '–'}
+                                                    </td>
+                                                );
+                                            })
+                                            : [<td key={race.id} className="border border-border px-2 py-1 text-center text-xs">–</td>]
+                                    )}
+                                    <td className="border border-border px-2 py-1" colSpan={2} />
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        });
+    };
+
+    // ─── Render: team championship standings ───────────────────────────────────
+    const renderTeamStandings = (classTbls: ReturnType<typeof buildClassTablesFromRaces>, raceList: CalendarRace[], keyPrefix = '') => {
+        return classTbls.map((cls) => {
+            const mode: 'best-car' | 'per-car' | 'f1-dual' = (() => {
+                if (['F1', 'F2', 'F3'].includes(shortName)) return 'f1-dual';
+                if (shortName === 'WEC' && ['GT3', 'LMP2', 'GTE'].some(c => cls.name.toUpperCase().includes(c)))
+                    return 'per-car';
+                return 'best-car';
+            })();
+
+            const sessionHeaders = raceList.map((race) =>
+                race.race_sessions.length > 0
+                    ? race.race_sessions.map((session) => (
+                        <th key={session.id} className="border border-border px-2 py-1">
+                            <Link
+                                href={races.show(race.id, { query: { has_sprint: race.sprint_race } }).url}
+                                className="hover:underline"
+                            >
+                                {session.is_sprint
+                                    ? `${race.race_code}S`
+                                    : race.race_sessions.filter(s => !s.is_sprint).length > 1
+                                        ? `${race.race_code} R${session.session_order}${race.endurance ? ' (E)' : ''}`
+                                        : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
+                            </Link>
+                        </th>
+                    ))
+                    : [<th key={race.id} className="border border-border px-2 py-1">{`${race.race_code}${race.endurance ? ' (E)' : ''}`}</th>]
+            );
+
+            const sessionCells = (sessionResults: Map<number, Result>) =>
+                raceList.map((race) =>
+                    race.race_sessions.length > 0
+                        ? race.race_sessions.map((session) => {
+                            const result = sessionResults.get(session.id);
+                            return (
+                                <td key={session.id} className={`px-2 py-1 ${resultCellClass(result)}`}>
+                                    {result
+                                        ? result.status === 'finished'
+                                            ? result.class_position
+                                            : result.status?.toUpperCase()
+                                        : ''}
+                                </td>
+                            );
+                        })
+                        : [<td key={race.id} className="border border-border px-2 py-1" />]
+                );
+
+            const denseRank = (pts: number[], idx: number): number => {
+                let rank = 1;
+                for (let i = 0; i < idx; i++) {
+                    if (pts[i] !== pts[idx]) rank++;
+                }
+                return rank;
+            };
+
+            // ── best-car mode ──────────────────────────────────────────
+            if (mode === 'best-car') {
+                type BCTeam = { teamName: string; bySession: Map<number, Result[]> };
+                const teamMap = new Map<number, BCTeam>();
+                for (const race of raceList) {
+                    for (const result of race.results) {
+                        if (result.status !== 'finished' || result.class_position == null) continue;
+                        const carInfo = entryCarMap.get(result.entry_car_id);
+                        if (!carInfo || carInfo.classId !== cls.id) continue;
+                        if (!teamMap.has(carInfo.teamId))
+                            teamMap.set(carInfo.teamId, { teamName: carInfo.teamName, bySession: new Map() });
+                        const t = teamMap.get(carInfo.teamId)!;
+                        if (!t.bySession.has(result.race_session_id)) t.bySession.set(result.race_session_id, []);
+                        t.bySession.get(result.race_session_id)!.push(result);
+                    }
+                }
+                type BCRow = { teamName: string; sessionResults: Map<number, Result>; totalPoints: number };
+                const rows: BCRow[] = [];
+                for (const [, team] of teamMap) {
+                    const sessionResults = new Map<number, Result>();
+                    let totalPoints = 0;
+                    for (const [sessionId, results] of team.bySession) {
+                        const best = results.reduce((a, b) =>
+                            Number(a.class_position) <= Number(b.class_position) ? a : b
+                        );
+                        sessionResults.set(sessionId, best);
+                        totalPoints += Number(best.points_awarded ?? 0);
+                    }
+                    rows.push({ teamName: team.teamName, sessionResults, totalPoints });
+                }
+                rows.sort((a, b) => b.totalPoints - a.totalPoints);
+                if (rows.length === 0) return null;
+                const pts = rows.map(r => r.totalPoints);
+                return (
+                    <div key={`${keyPrefix}team-${cls.id}`}>
+                        <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
+                        <div className="overflow-x-auto">
+                            <table className="text-sm text-center w-full border-collapse">
+                                <thead><tr>
+                                    <th className="border border-border px-2 py-1">Pos</th>
+                                    <th className="border border-border px-2 py-1 text-left">Team</th>
+                                    {sessionHeaders}
+                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
+                                </tr></thead>
+                                <tbody>
+                                    {rows.map((row, idx) => (
+                                        <tr key={idx}>
+                                            <td className="border border-border px-2 py-1">{denseRank(pts, idx)}</td>
+                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">{row.teamName}</td>
+                                            {sessionCells(row.sessionResults)}
+                                            <td className="border border-border px-2 py-1 font-bold">
+                                                {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ── per-car mode ───────────────────────────────────────────
+            if (mode === 'per-car') {
+                type PCRow = { label: string; sessionResults: Map<number, Result>; totalPoints: number };
+                const carMap = new Map<number, PCRow>();
+                for (const race of raceList) {
+                    for (const result of race.results) {
+                        if (result.status !== 'finished' || result.class_position == null) continue;
+                        const carInfo = entryCarMap.get(result.entry_car_id);
+                        if (!carInfo || carInfo.classId !== cls.id) continue;
+                        if (!carMap.has(result.entry_car_id)) {
+                            carMap.set(result.entry_car_id, {
+                                label: `#${carInfo.carNumber} ${carInfo.teamName}`,
+                                sessionResults: new Map(),
+                                totalPoints: 0,
+                            });
+                        }
+                        const row = carMap.get(result.entry_car_id)!;
+                        row.sessionResults.set(result.race_session_id, result);
+                        row.totalPoints += Number(result.points_awarded ?? 0);
+                    }
+                }
+                const rows = Array.from(carMap.values()).sort((a, b) => b.totalPoints - a.totalPoints);
+                if (rows.length === 0) return null;
+                const pts = rows.map(r => r.totalPoints);
+                return (
+                    <div key={`${keyPrefix}team-${cls.id}`}>
+                        <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
+                        <div className="overflow-x-auto">
+                            <table className="text-sm text-center w-full border-collapse">
+                                <thead><tr>
+                                    <th className="border border-border px-2 py-1">Pos</th>
+                                    <th className="border border-border px-2 py-1 text-left">Car</th>
+                                    {sessionHeaders}
+                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
+                                </tr></thead>
+                                <tbody>
+                                    {rows.map((row, idx) => (
+                                        <tr key={idx}>
+                                            <td className="border border-border px-2 py-1">{denseRank(pts, idx)}</td>
+                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">{row.label}</td>
+                                            {sessionCells(row.sessionResults)}
+                                            <td className="border border-border px-2 py-1 font-bold">
+                                                {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ── f1-dual mode ───────────────────────────────────────────
+            type F1DriverRow = {
+                driverId: number;
+                driverName: string;
+                carNumber: string;
+                sessionResults: Map<number, Result>;
+                totalPoints: number;
+            };
+            type F1TeamRow = {
+                teamId: number;
+                teamName: string;
+                drivers: F1DriverRow[];
+                totalPoints: number;
+            };
+
+            const driverRowMap = new Map<number, F1DriverRow>();
+            const driverTeamMap = new Map<number, number>();
+            for (const race of raceList) {
+                for (const result of race.results) {
+                    const carInfo = entryCarMap.get(result.entry_car_id);
+                    if (!carInfo || carInfo.classId !== cls.id) continue;
+                    for (const rd of result.result_drivers ?? []) {
+                        const driver = rd.driver;
+                        if (!driver) continue;
+                        driverTeamMap.set(driver.id, carInfo.teamId);
+                        if (!driverRowMap.has(driver.id)) {
+                            driverRowMap.set(driver.id, {
+                                driverId: driver.id,
+                                driverName: `${driver.first_name} ${driver.last_name}`,
+                                carNumber: carInfo.carNumber,
+                                sessionResults: new Map(),
+                                totalPoints: 0,
+                            });
+                        }
+                        const dr = driverRowMap.get(driver.id)!;
+                        dr.sessionResults.set(result.race_session_id, result);
+                        dr.totalPoints += Number(result.points_awarded ?? 0);
+                    }
+                }
+            }
+
+            const f1TeamMap = new Map<number, F1TeamRow>();
+            for (const [driverId, driverRow] of driverRowMap) {
+                const teamId = driverTeamMap.get(driverId) ?? 0;
+                if (!f1TeamMap.has(teamId)) {
+                    let teamName = '';
+                    for (const [, ci] of entryCarMap) {
+                        if (ci.teamId === teamId && ci.classId === cls.id) { teamName = ci.teamName; break; }
+                    }
+                    f1TeamMap.set(teamId, { teamId, teamName, drivers: [], totalPoints: 0 });
+                }
+                f1TeamMap.get(teamId)!.drivers.push(driverRow);
+            }
+            const f1Teams: F1TeamRow[] = [];
+            for (const team of f1TeamMap.values()) {
+                team.drivers.sort((a, b) => b.totalPoints - a.totalPoints);
+                team.totalPoints = team.drivers.reduce((s, d) => s + d.totalPoints, 0);
+                f1Teams.push(team);
+            }
+            f1Teams.sort((a, b) => b.totalPoints - a.totalPoints);
+            if (f1Teams.length === 0) return null;
+            const teamPts = f1Teams.map(t => t.totalPoints);
+
+            return (
+                <div key={`${keyPrefix}team-${cls.id}`}>
+                    <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
+                    <div className="overflow-x-auto">
+                        <table className="text-sm text-center w-full border-collapse">
+                            <thead><tr>
+                                <th className="border border-border px-2 py-1">Pos</th>
+                                <th className="border border-border px-2 py-1 text-left">Driver</th>
+                                <th className="border border-border px-2 py-1">No.</th>
+                                <th className="border border-border px-2 py-1 text-left">Team</th>
+                                {sessionHeaders}
+                                <th className="border border-border px-2 py-1 font-bold">Pts</th>
+                            </tr></thead>
+                            <tbody>
+                                {f1Teams.map((team, tIdx) =>
+                                    team.drivers.map((driver, dIdx) => (
+                                        <tr key={`${team.teamId}-${driver.driverId}`}>
+                                            {dIdx === 0 && (
+                                                <td className="border border-border px-2 py-1" rowSpan={team.drivers.length}>
+                                                    {denseRank(teamPts, tIdx)}
+                                                </td>
+                                            )}
+                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">
+                                                {driver.driverName}
+                                            </td>
+                                            <td className="border border-border px-2 py-1">#{driver.carNumber}</td>
+                                            {dIdx === 0 && (
+                                                <td className="border border-border px-2 py-1 text-left whitespace-nowrap" rowSpan={team.drivers.length}>
+                                                    {team.teamName}
+                                                </td>
+                                            )}
+                                            {sessionCells(driver.sessionResults)}
+                                            {dIdx === 0 && (
+                                                <td className="border border-border px-2 py-1 font-bold" rowSpan={team.drivers.length}>
+                                                    {Number(team.totalPoints).toFixed(Number.isInteger(team.totalPoints) ? 0 : 1)}
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -415,525 +974,25 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                             </div>
                         )}
 
-                        {/* Driver championship standings per class */}
-                        {classTables.map((cls) => {
-                            // Compute hidden points for 0-pt drivers (lower = better, like golf)
-                            const hiddenPtsMap = new Map<number, number>();
-                            for (const row of cls.rows.values()) {
-                                if (row.totalPoints > 0) continue;
-                                let hidden = 0;
-                                for (const race of sortedRaces) {
-                                    for (const session of race.race_sessions) {
-                                        const classCompetitors = race.results.filter(r =>
-                                            r.race_session_id === session.id &&
-                                            entryCarMap.get(r.entry_car_id)?.classId === cls.id
-                                        ).length;
-                                        if (classCompetitors === 0) continue; // session not yet run
-                                        const result = row.raceResults.get(session.id);
-                                        if (!result) {
-                                            hidden += classCompetitors + 1; // did not participate
-                                        } else if (result.status === 'finished') {
-                                            hidden += Number(result.class_position ?? classCompetitors + 1);
-                                        } else {
-                                            hidden += classCompetitors; // DNF / DNS / DSQ
-                                        }
-                                    }
-                                }
-                                hiddenPtsMap.set(row.driverId, hidden);
-                            }
+                        {/* Overall standings (always shown) */}
+                        {hasEnduranceMix && (
+                            <h3 className="text-lg font-bold border-b-2 border-primary pb-1">Overall Championship</h3>
+                        )}
+                        {renderDriverStandings(classTables, sortedRaces, 'overall-')}
+                        {renderTeamStandings(classTables, sortedRaces, 'overall-')}
 
-                            const sortedRows = Array.from(cls.rows.values()).sort((a, b) => {
-                                if (a.totalPoints > 0 && b.totalPoints > 0)
-                                    return b.totalPoints - a.totalPoints || a.teamName.localeCompare(b.teamName);
-                                if (a.totalPoints > 0) return -1;
-                                if (b.totalPoints > 0) return 1;
-                                // Both 0 pts: sort by hidden points asc, then team name
-                                const ha = hiddenPtsMap.get(a.driverId) ?? 0;
-                                const hb = hiddenPtsMap.get(b.driverId) ?? 0;
-                                return ha - hb || a.teamName.localeCompare(b.teamName);
-                            });
-                            const leaderPts = sortedRows[0]?.totalPoints ?? 0;
+                        {/* Sub-standings when season has both endurance and regular races */}
+                        {hasEnduranceMix && (
+                            <>
+                                <h3 className="text-lg font-bold border-b-2 border-primary pb-1 mt-4">Endurance Championship</h3>
+                                {renderDriverStandings(enduranceClassTables, enduranceSortedRaces, 'end-')}
+                                {renderTeamStandings(enduranceClassTables, enduranceSortedRaces, 'end-')}
 
-                            // Rank: points drivers — same team + same pts share a rank
-                            //       0-pt drivers  — same team + same hidden pts share a rank
-                            const driverRankMap = new Map<number, number>();
-                            let dRank = 0, prevDriverKey = '';
-                            for (const row of sortedRows) {
-                                const key = row.totalPoints > 0
-                                    ? `pts:${row.teamName}:${row.totalPoints}`
-                                    : `npts:${row.teamName}:${hiddenPtsMap.get(row.driverId) ?? 0}`;
-                                if (key !== prevDriverKey) { dRank++; prevDriverKey = key; }
-                                driverRankMap.set(row.driverId, dRank);
-                            }
-                            const driverRank = (id: number) => driverRankMap.get(id) ?? 0;
-
-                            return (
-                                <div key={cls.id}>
-                                    <h4 className="mb-2 uppercase font-bold border-b border-border pb-1">
-                                        {cls.name}
-                                    </h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="text-sm text-center w-full border-collapse">
-                                            <thead>
-                                                <tr>
-                                                    <th className="border border-border px-2 py-1">Pos</th>
-                                                    <th className="border border-border px-2 py-1 text-left">Driver</th>
-                                                    <th className="border border-border px-2 py-1">No.</th>
-                                                    <th className="border border-border px-2 py-1 text-left">Team</th>
-                                                    {sortedRaces.map((race) =>
-                                                        race.race_sessions.length > 0
-                                                            ? race.race_sessions.map((session) => (
-                                                                <th key={session.id} className="border border-border px-2 py-1">
-                                                                    <Link
-                                                                        href={races.show(race.id, {
-                                                                            query: { has_sprint: race.sprint_race },
-                                                                        }).url}
-                                                                        className="hover:underline"
-                                                                    >
-                                                                        {session.is_sprint
-                                                                            ? `${race.race_code}S`
-                                                                            : race.race_code}
-                                                                    </Link>
-                                                                </th>
-                                                            ))
-                                                            : [
-                                                                <th key={race.id} className="border border-border px-2 py-1">
-                                                                    <Link
-                                                                        href={races.show(race.id, {
-                                                                            query: { has_sprint: race.sprint_race },
-                                                                        }).url}
-                                                                        className="hover:underline"
-                                                                    >
-                                                                        {race.race_code}
-                                                                    </Link>
-                                                                </th>
-                                                            ]
-                                                    )}
-                                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
-                                                    <th className="border border-border px-2 py-1"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {sortedRows.map((row, idx) => {
-                                                    const displayPos = driverRank(row.driverId);
-                                                    return (
-                                                    <tr key={row.driverId}>
-                                                        <td className="border border-border px-2 py-1">{displayPos}</td>
-                                                        <td className="border border-border px-2 py-1 text-left whitespace-nowrap">
-                                                            {row.driver.first_name} {row.driver.last_name}
-                                                        </td>
-                                                        <td className="border border-border px-2 py-1">#{row.carNumber}</td>
-                                                        <td className="border border-border px-2 py-1 text-left text-muted-foreground whitespace-nowrap">
-                                                            {row.teamName}
-                                                        </td>
-                                                        {sortedRaces.map((race) =>
-                                                            race.race_sessions.length > 0
-                                                                ? race.race_sessions.map((session) => {
-                                                                    const result = row.raceResults.get(session.id);
-                                                                    const pBadge = (() => {
-                                                                        if (!result) return false;
-                                                                        const finalQS = [...(race.qualifying_sessions ?? [])].sort(
-                                                                            (a, b) => b.session_order - a.session_order
-                                                                        )[0];
-                                                                        if (!finalQS) return false;
-                                                                        const classPole = finalQS.results
-                                                                            .filter((qr) => {
-                                                                                const ci = entryCarMap.get(qr.entry_car_id);
-                                                                                return ci?.classId === cls.id;
-                                                                            })
-                                                                            .sort((a, b) => a.position - b.position)[0];
-                                                                        return classPole?.entry_car_id === result.entry_car_id;
-                                                                    })();
-                                                                    return (
-                                                                        <td
-                                                                            key={session.id}
-                                                                            className={`px-2 py-1 text-center ${resultCellClass(result)}`}
-                                                                        >
-                                                                            {resultCellText(result)}
-                                                                            {pBadge && (
-                                                                                <sup className="ml-0.5 text-xs font-bold">P</sup>
-                                                                            )}
-                                                                            {result?.fastest_lap && (
-                                                                                <sup className="ml-0.5 text-xs font-bold text-purple-600">FL</sup>
-                                                                            )}
-                                                                        </td>
-                                                                    );
-                                                                })
-                                                                : [<td key={race.id} className="border border-border px-2 py-1" />]
-                                                        )}
-                                                        <td className="border border-border px-2 py-1 font-bold">
-                                                            {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
-                                                        </td>
-                                                        <td className="border border-border px-2 py-1 text-muted-foreground text-xs">
-                                                            {row.totalPoints > 0 && idx > 0 && `${(row.totalPoints - leaderPts).toFixed(0)}`}
-                                                        </td>
-                                                    </tr>
-                                                    );
-                                                })}
-
-                                                {/* Pole Position row */}
-                                                <tr className="bg-muted/50 font-semibold">
-                                                    <td className="border border-border px-2 py-1 text-left" colSpan={4}>
-                                                        Pole Position
-                                                    </td>
-                                                    {sortedRaces.map((race) =>
-                                                        race.race_sessions.length > 0
-                                                            ? race.race_sessions.map((session) => {
-                                                                const finalQS = [...(race.qualifying_sessions ?? [])].sort(
-                                                                    (a, b) => b.session_order - a.session_order
-                                                                )[0];
-                                                                const pole = finalQS?.results
-                                                                    .filter((qr) => {
-                                                                        const ci = entryCarMap.get(qr.entry_car_id);
-                                                                        return ci?.classId === cls.id;
-                                                                    })
-                                                                    .sort((a, b) => a.position - b.position)[0];
-                                                                const carInfo = pole
-                                                                    ? entryCarMap.get(pole.entry_car_id)
-                                                                    : undefined;
-                                                                return (
-                                                                    <td
-                                                                        key={session.id}
-                                                                        className="border border-border px-2 py-1 text-center text-xs"
-                                                                    >
-                                                                        {carInfo ? (
-                                                                            <>
-                                                                                <div>#{carInfo.carNumber}</div>
-                                                                                <div className="text-muted-foreground">
-                                                                                    {msToLap(pole?.best_lap_time_ms ?? null)}
-                                                                                </div>
-                                                                            </>
-                                                                        ) : '–'}
-                                                                    </td>
-                                                                );
-                                                            })
-                                                            : [<td key={race.id} className="border border-border px-2 py-1 text-center text-xs">–</td>]
-                                                    )}
-                                                    <td className="border border-border px-2 py-1" colSpan={2} />
-                                                </tr>
-
-                                                {/* Fastest Lap row */}
-                                                <tr className="bg-muted/50 font-semibold">
-                                                    <td className="border border-border px-2 py-1 text-left" colSpan={4}>
-                                                        Fastest Lap
-                                                    </td>
-                                                    {sortedRaces.map((race) =>
-                                                        race.race_sessions.length > 0
-                                                            ? race.race_sessions.map((session) => {
-                                                                const fastest = race.results.find(
-                                                                    (r) =>
-                                                                        r.race_session_id === session.id &&
-                                                                        r.fastest_lap &&
-                                                                        entryCarMap.get(r.entry_car_id)?.classId === cls.id
-                                                                );
-                                                                const carInfo = fastest
-                                                                    ? entryCarMap.get(fastest.entry_car_id)
-                                                                    : undefined;
-                                                                return (
-                                                                    <td
-                                                                        key={session.id}
-                                                                        className="border border-border px-2 py-1 text-center text-xs"
-                                                                    >
-                                                                        {carInfo ? (
-                                                                            <>
-                                                                                <div>#{carInfo.carNumber}</div>
-                                                                                <div className="text-muted-foreground">
-                                                                                    {msToLap(fastest?.fastest_lap_time_ms ?? null)}
-                                                                                </div>
-                                                                            </>
-                                                                        ) : '–'}
-                                                                    </td>
-                                                                );
-                                                            })
-                                                            : [<td key={race.id} className="border border-border px-2 py-1 text-center text-xs">–</td>]
-                                                    )}
-                                                    <td className="border border-border px-2 py-1" colSpan={2} />
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {/* Team championship standings */}
-                        {classTables.map((cls) => {
-                            // Determine standings mode from series short_name
-                            const mode: 'best-car' | 'per-car' | 'f1-dual' = (() => {
-                                if (['F1', 'F2', 'F3'].includes(shortName)) return 'f1-dual';
-                                if (shortName === 'WEC' && ['GT3', 'LMP2', 'GTE'].some(c => cls.name.toUpperCase().includes(c)))
-                                    return 'per-car';
-                                return 'best-car';
-                            })();
-
-                            // Shared header: race session columns
-                            const sessionHeaders = sortedRaces.map((race) =>
-                                race.race_sessions.length > 0
-                                    ? race.race_sessions.map((session) => (
-                                        <th key={session.id} className="border border-border px-2 py-1">
-                                            <Link
-                                                href={races.show(race.id, { query: { has_sprint: race.sprint_race } }).url}
-                                                className="hover:underline"
-                                            >
-                                                {session.is_sprint ? `${race.race_code}S` : race.race_code}
-                                            </Link>
-                                        </th>
-                                    ))
-                                    : [<th key={race.id} className="border border-border px-2 py-1">{race.race_code}</th>]
-                            );
-
-                            // Shared: render session cells for a sessionResults map
-                            const sessionCells = (sessionResults: Map<number, Result>) =>
-                                sortedRaces.map((race) =>
-                                    race.race_sessions.length > 0
-                                        ? race.race_sessions.map((session) => {
-                                            const result = sessionResults.get(session.id);
-                                            return (
-                                                <td key={session.id} className={`px-2 py-1 ${resultCellClass(result)}`}>
-                                                    {result
-                                                        ? result.status === 'finished'
-                                                            ? result.class_position
-                                                            : result.status?.toUpperCase()
-                                                        : ''}
-                                                </td>
-                                            );
-                                        })
-                                        : [<td key={race.id} className="border border-border px-2 py-1" />]
-                                );
-
-                            // Dense rank helper
-                            const denseRank = (pts: number[], idx: number): number => {
-                                let rank = 1;
-                                for (let i = 0; i < idx; i++) {
-                                    if (pts[i] !== pts[idx]) rank++;
-                                }
-                                return rank;
-                            };
-
-                            // ── best-car mode ──────────────────────────────────────────
-                            if (mode === 'best-car') {
-                                type BCTeam = { teamName: string; bySession: Map<number, Result[]> };
-                                const teamMap = new Map<number, BCTeam>();
-                                for (const race of sortedRaces) {
-                                    for (const result of race.results) {
-                                        if (result.status !== 'finished' || result.class_position == null) continue;
-                                        const carInfo = entryCarMap.get(result.entry_car_id);
-                                        if (!carInfo || carInfo.classId !== cls.id) continue;
-                                        if (!teamMap.has(carInfo.teamId))
-                                            teamMap.set(carInfo.teamId, { teamName: carInfo.teamName, bySession: new Map() });
-                                        const t = teamMap.get(carInfo.teamId)!;
-                                        if (!t.bySession.has(result.race_session_id)) t.bySession.set(result.race_session_id, []);
-                                        t.bySession.get(result.race_session_id)!.push(result);
-                                    }
-                                }
-                                type BCRow = { teamName: string; sessionResults: Map<number, Result>; totalPoints: number };
-                                const rows: BCRow[] = [];
-                                for (const [, team] of teamMap) {
-                                    const sessionResults = new Map<number, Result>();
-                                    let totalPoints = 0;
-                                    for (const [sessionId, results] of team.bySession) {
-                                        const best = results.reduce((a, b) =>
-                                            Number(a.class_position) <= Number(b.class_position) ? a : b
-                                        );
-                                        sessionResults.set(sessionId, best);
-                                        totalPoints += Number(best.points_awarded ?? 0);
-                                    }
-                                    rows.push({ teamName: team.teamName, sessionResults, totalPoints });
-                                }
-                                rows.sort((a, b) => b.totalPoints - a.totalPoints);
-                                if (rows.length === 0) return null;
-                                const pts = rows.map(r => r.totalPoints);
-                                return (
-                                    <div key={`team-${cls.id}`}>
-                                        <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
-                                        <div className="overflow-x-auto">
-                                            <table className="text-sm text-center w-full border-collapse">
-                                                <thead><tr>
-                                                    <th className="border border-border px-2 py-1">Pos</th>
-                                                    <th className="border border-border px-2 py-1 text-left">Team</th>
-                                                    {sessionHeaders}
-                                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
-                                                </tr></thead>
-                                                <tbody>
-                                                    {rows.map((row, idx) => (
-                                                        <tr key={idx}>
-                                                            <td className="border border-border px-2 py-1">{denseRank(pts, idx)}</td>
-                                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">{row.teamName}</td>
-                                                            {sessionCells(row.sessionResults)}
-                                                            <td className="border border-border px-2 py-1 font-bold">
-                                                                {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // ── per-car mode ───────────────────────────────────────────
-                            if (mode === 'per-car') {
-                                type PCRow = { label: string; sessionResults: Map<number, Result>; totalPoints: number };
-                                const carMap = new Map<number, PCRow>();
-                                for (const race of sortedRaces) {
-                                    for (const result of race.results) {
-                                        if (result.status !== 'finished' || result.class_position == null) continue;
-                                        const carInfo = entryCarMap.get(result.entry_car_id);
-                                        if (!carInfo || carInfo.classId !== cls.id) continue;
-                                        if (!carMap.has(result.entry_car_id)) {
-                                            carMap.set(result.entry_car_id, {
-                                                label: `#${carInfo.carNumber} ${carInfo.teamName}`,
-                                                sessionResults: new Map(),
-                                                totalPoints: 0,
-                                            });
-                                        }
-                                        const row = carMap.get(result.entry_car_id)!;
-                                        row.sessionResults.set(result.race_session_id, result);
-                                        row.totalPoints += Number(result.points_awarded ?? 0);
-                                    }
-                                }
-                                const rows = Array.from(carMap.values()).sort((a, b) => b.totalPoints - a.totalPoints);
-                                if (rows.length === 0) return null;
-                                const pts = rows.map(r => r.totalPoints);
-                                return (
-                                    <div key={`team-${cls.id}`}>
-                                        <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
-                                        <div className="overflow-x-auto">
-                                            <table className="text-sm text-center w-full border-collapse">
-                                                <thead><tr>
-                                                    <th className="border border-border px-2 py-1">Pos</th>
-                                                    <th className="border border-border px-2 py-1 text-left">Car</th>
-                                                    {sessionHeaders}
-                                                    <th className="border border-border px-2 py-1 font-bold">Pts</th>
-                                                </tr></thead>
-                                                <tbody>
-                                                    {rows.map((row, idx) => (
-                                                        <tr key={idx}>
-                                                            <td className="border border-border px-2 py-1">{denseRank(pts, idx)}</td>
-                                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">{row.label}</td>
-                                                            {sessionCells(row.sessionResults)}
-                                                            <td className="border border-border px-2 py-1 font-bold">
-                                                                {Number(row.totalPoints).toFixed(Number.isInteger(row.totalPoints) ? 0 : 1)}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // ── f1-dual mode ───────────────────────────────────────────
-                            type F1DriverRow = {
-                                driverId: number;
-                                driverName: string;
-                                carNumber: string;
-                                sessionResults: Map<number, Result>;
-                                totalPoints: number;
-                            };
-                            type F1TeamRow = {
-                                teamId: number;
-                                teamName: string;
-                                drivers: F1DriverRow[];
-                                totalPoints: number;
-                            };
-
-                            const driverRowMap = new Map<number, F1DriverRow>();
-                            const driverTeamMap = new Map<number, number>();
-                            for (const race of sortedRaces) {
-                                for (const result of race.results) {
-                                    const carInfo = entryCarMap.get(result.entry_car_id);
-                                    if (!carInfo || carInfo.classId !== cls.id) continue;
-                                    for (const rd of result.result_drivers ?? []) {
-                                        const driver = rd.driver;
-                                        if (!driver) continue;
-                                        driverTeamMap.set(driver.id, carInfo.teamId);
-                                        if (!driverRowMap.has(driver.id)) {
-                                            driverRowMap.set(driver.id, {
-                                                driverId: driver.id,
-                                                driverName: `${driver.first_name} ${driver.last_name}`,
-                                                carNumber: carInfo.carNumber,
-                                                sessionResults: new Map(),
-                                                totalPoints: 0,
-                                            });
-                                        }
-                                        const dr = driverRowMap.get(driver.id)!;
-                                        dr.sessionResults.set(result.race_session_id, result);
-                                        dr.totalPoints += Number(result.points_awarded ?? 0);
-                                    }
-                                }
-                            }
-
-                            const f1TeamMap = new Map<number, F1TeamRow>();
-                            for (const [driverId, driverRow] of driverRowMap) {
-                                const teamId = driverTeamMap.get(driverId) ?? 0;
-                                if (!f1TeamMap.has(teamId)) {
-                                    let teamName = '';
-                                    for (const [, ci] of entryCarMap) {
-                                        if (ci.teamId === teamId && ci.classId === cls.id) { teamName = ci.teamName; break; }
-                                    }
-                                    f1TeamMap.set(teamId, { teamId, teamName, drivers: [], totalPoints: 0 });
-                                }
-                                f1TeamMap.get(teamId)!.drivers.push(driverRow);
-                            }
-                            const f1Teams: F1TeamRow[] = [];
-                            for (const team of f1TeamMap.values()) {
-                                team.drivers.sort((a, b) => b.totalPoints - a.totalPoints);
-                                team.totalPoints = team.drivers.reduce((s, d) => s + d.totalPoints, 0);
-                                f1Teams.push(team);
-                            }
-                            f1Teams.sort((a, b) => b.totalPoints - a.totalPoints);
-                            if (f1Teams.length === 0) return null;
-                            const teamPts = f1Teams.map(t => t.totalPoints);
-
-                            return (
-                                <div key={`team-${cls.id}`}>
-                                    <h5 className="mb-2 border-b border-border pb-1 font-bold">{cls.name} — Team Standings</h5>
-                                    <div className="overflow-x-auto">
-                                        <table className="text-sm text-center w-full border-collapse">
-                                            <thead><tr>
-                                                <th className="border border-border px-2 py-1">Pos</th>
-                                                <th className="border border-border px-2 py-1 text-left">Driver</th>
-                                                <th className="border border-border px-2 py-1">No.</th>
-                                                <th className="border border-border px-2 py-1 text-left">Team</th>
-                                                {sessionHeaders}
-                                                <th className="border border-border px-2 py-1 font-bold">Pts</th>
-                                            </tr></thead>
-                                            <tbody>
-                                                {f1Teams.map((team, tIdx) =>
-                                                    team.drivers.map((driver, dIdx) => (
-                                                        <tr key={`${team.teamId}-${driver.driverId}`}>
-                                                            {dIdx === 0 && (
-                                                                <td className="border border-border px-2 py-1" rowSpan={team.drivers.length}>
-                                                                    {denseRank(teamPts, tIdx)}
-                                                                </td>
-                                                            )}
-                                                            <td className="border border-border px-2 py-1 text-left whitespace-nowrap">
-                                                                {driver.driverName}
-                                                            </td>
-                                                            <td className="border border-border px-2 py-1">#{driver.carNumber}</td>
-                                                            {dIdx === 0 && (
-                                                                <td className="border border-border px-2 py-1 text-left whitespace-nowrap" rowSpan={team.drivers.length}>
-                                                                    {team.teamName}
-                                                                </td>
-                                                            )}
-                                                            {sessionCells(driver.sessionResults)}
-                                                            {dIdx === 0 && (
-                                                                <td className="border border-border px-2 py-1 font-bold" rowSpan={team.drivers.length}>
-                                                                    {Number(team.totalPoints).toFixed(Number.isInteger(team.totalPoints) ? 0 : 1)}
-                                                                </td>
-                                                            )}
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                <h3 className="text-lg font-bold border-b-2 border-primary pb-1 mt-4">Sprint Championship</h3>
+                                {renderDriverStandings(regularClassTables, regularSortedRaces, 'sprint-')}
+                                {renderTeamStandings(regularClassTables, regularSortedRaces, 'sprint-')}
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -941,7 +1000,6 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                 {currentTab === 'teams' && (
                     <div className="flex flex-col gap-8">
                         {season.season_classes.map((sc) => {
-                            // Group cars by entrant+carModel+engine
                             type GroupedCar = {
                                 groupKey: string;
                                 carModelName: string;

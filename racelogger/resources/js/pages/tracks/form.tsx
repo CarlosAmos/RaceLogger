@@ -26,6 +26,7 @@ interface TrackLayout {
 interface Track {
     id: number | null;
     name: string;
+    name_short: string | null;
     city: string | null;
     country_id: number | null;
     layouts?: TrackLayout[];
@@ -47,6 +48,7 @@ export default function TrackForm({ track, countries, mode }: Props) {
 
     const { data, setData, post, put, processing, errors } = useForm({
         name: track.name ?? '',
+        name_short: track.name_short ?? '',
         city: track.city ?? '',
         country_id: track.country_id ? String(track.country_id) : '',
     });
@@ -77,6 +79,17 @@ export default function TrackForm({ track, countries, mode }: Props) {
                             required
                         />
                         <InputError message={errors.name} />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label htmlFor="name_short">Short Name</Label>
+                        <Input
+                            id="name_short"
+                            value={data.name_short}
+                            onChange={(e) => setData('name_short', e.target.value)}
+                            placeholder="Monaco"
+                        />
+                        <InputError message={errors.name_short} />
                     </div>
 
                     <div className="space-y-1">

@@ -89,17 +89,8 @@ class DriverCareerService
                     /* Check the locked status from the calendar_races table */
                     CASE WHEN MIN(cr.is_locked) = 0 THEN 1 ELSE 0 END as has_unlocked_races,
 
-                    /* Fastest Lap (Class-Aware ms check) */
-                    COUNT(DISTINCT CASE 
-                        WHEN r.fastest_lap_time_ms > 0 AND r.fastest_lap_time_ms = (
-                            SELECT MIN(r_all.fastest_lap_time_ms) 
-                            FROM results r_all
-                            JOIN entry_cars ec_all ON r_all.entry_car_id = ec_all.id
-                            JOIN entry_cars ec_current ON r.entry_car_id = ec_current.id
-                            WHERE r_all.race_session_id = r.race_session_id 
-                            AND ec_all.entry_class_id = ec_current.entry_class_id 
-                            AND r_all.fastest_lap_time_ms > 0
-                        ) THEN r.id END) as fastest_laps,
+                    /* Fastest Lap — use the flag set by ResultService */
+                    COUNT(DISTINCT CASE WHEN r.fastest_lap = 1 THEN r.id END) as fastest_laps,
 
                     /* Poles (Car-Aware) */
                     (SELECT COUNT(DISTINCT qr.id) 

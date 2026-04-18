@@ -238,11 +238,8 @@ class ResultService
                 $result['gap_laps_down'] = null;
             }
 
-            // Detect fastest lap
-            if (
-                !is_null($result['fastest_lap_time_ms']) &&
-                $result['status'] === 'finished'
-            ) {
+            // Detect fastest lap (any driver with a recorded time is eligible)
+            if (!is_null($result['fastest_lap_time_ms'])) {
                 if (
                     !$fastestLapCandidate ||
                     $result['fastest_lap_time_ms'] <

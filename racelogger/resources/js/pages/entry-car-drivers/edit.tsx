@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import InputError from '@/components/input-error';
@@ -75,6 +77,8 @@ export default function EntryCarDriversEdit({
         { title: 'Drivers', href: '#' },
     ];
 
+    const [search, setSearch] = useState('');
+
     const { data, setData, post, processing, errors } = useForm({
         drivers: assignedDrivers,
     });
@@ -91,8 +95,13 @@ export default function EntryCarDriversEdit({
         post(entryCarDriversRoutes.update(routeArgs).url);
     }
 
-    const availableDrivers = drivers.filter((d) => !otherCarDriverIds.includes(d.id));
-    const unavailableDrivers = drivers.filter((d) => otherCarDriverIds.includes(d.id));
+    const matchesSearch = (d: Driver) => {
+        const q = search.toLowerCase();
+        return !q || `${d.first_name} ${d.last_name}`.toLowerCase().includes(q);
+    };
+
+    const availableDrivers = drivers.filter((d) => !otherCarDriverIds.includes(d.id) && matchesSearch(d));
+    const unavailableDrivers = drivers.filter((d) => otherCarDriverIds.includes(d.id) && matchesSearch(d));
 
     const driverCard = (driver: Driver, disabled: boolean) => {
         const isAssigned = data.drivers.includes(driver.id);
@@ -133,6 +142,13 @@ export default function EntryCarDriversEdit({
                         <h1 className="text-2xl font-semibold">Assign Drivers</h1>
                     </div>
                 </div>
+
+                <Input
+                    placeholder="Search drivers..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="max-w-sm"
+                />
 
                 <form onSubmit={submit} className="flex flex-col gap-6">
                     <Button type="submit" disabled={processing} className="w-fit">

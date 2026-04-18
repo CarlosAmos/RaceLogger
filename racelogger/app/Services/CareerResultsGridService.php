@@ -125,11 +125,12 @@ class CareerResultsGridService
                 } else {
                     foreach ($roundSessions as $session) {
                         $merged->push((object) [
-                            'season_id'    => $seasonId,
-                            'round_number' => $race->round_number,
-                            'race_code'    => $race->race_code,
-                            'session_id'   => $session->session_id,
-                            'is_sprint'    => $session->is_sprint,
+                            'season_id'     => $seasonId,
+                            'round_number'  => $race->round_number,
+                            'race_code'     => $race->race_code,
+                            'session_id'    => $session->session_id,
+                            'is_sprint'     => $session->is_sprint,
+                            'session_order' => $session->session_order,
                         ]);
                     }
                 }
@@ -170,8 +171,9 @@ class CareerResultsGridService
                     }
                     if ($row->session_id !== null) {
                         $calendar[$round]['sessions'][] = [
-                            'session_id' => $row->session_id,
-                            'is_sprint'  => (bool) $row->is_sprint,
+                            'session_id'    => $row->session_id,
+                            'is_sprint'     => (bool) $row->is_sprint,
+                            'session_order' => $row->session_order,
                         ];
                     }
                 }

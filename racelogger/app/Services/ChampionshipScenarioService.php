@@ -92,7 +92,9 @@ class ChampionshipScenarioService
 
         foreach ($racesAfterNext as $race) {
             $points = $this->getPointsForRace($race);
-            $max += max($points);
+            if (!empty($points)) {
+                $max += max($points);
+            }
         }
 
         return $max;
@@ -149,6 +151,10 @@ public function getClinchTable($seasonId, $seasonClassId)
     $pointsTable = $this->getPointsForRace($nextRace);
 
     $maxAfterNext = $this->maxPointsRemainingAfterNextRace($remainingRaces);
+
+    if (empty($pointsTable)) {
+        return null;
+    }
 
     $maxRacePoints = max($pointsTable);
 

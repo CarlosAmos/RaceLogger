@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Constructor;
 use App\Models\Entrant;
 use App\Models\Season;
+use App\Models\SeasonEntry;
 use App\Models\World;
 use Inertia\Inertia;
 
@@ -94,10 +95,15 @@ class SeasonEntryController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified season entry and all its cars/drivers.
      */
-    public function destroy(string $id)
+    public function destroy(World $world, Season $season, SeasonEntry $seasonEntry)
     {
-        //
+        $seasonEntry->delete();
+
+        return redirect()
+            ->route('worlds.seasons.edit', [$world, $season])
+            ->with('success', 'Team removed from season.')
+            ->setStatusCode(303);
     }
 }

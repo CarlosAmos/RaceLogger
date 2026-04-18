@@ -54,15 +54,16 @@ class PointsCalculationService
 
             $points = 0;
 
-            $classPosition = $result['class_position'] ?? null;
+            // Only award race points to drivers who finished
+            if (($result['status'] ?? '') === 'finished') {
+                $classPosition = $result['class_position'] ?? null;
 
-            if ($classPosition) {
+                if ($classPosition) {
+                    $rule = $raceRules->firstWhere('position', $classPosition);
 
-                $rule = $raceRules
-                    ->firstWhere('position', $classPosition);
-
-                if ($rule) {
-                    $points += $rule->points;
+                    if ($rule) {
+                        $points += $rule->points;
+                    }
                 }
             }
 
@@ -112,11 +113,10 @@ class PointsCalculationService
                         foreach ($results as &$result) {
 
                             if (
-                                $result['entry_car_id'] ==
-                                $qualiResult->entry_car_id
+                                $result['entry_car_id'] == $qualiResult->entry_car_id &&
+                                ($result['status'] ?? '') === 'finished'
                             ) {
-                                $result['points_awarded'] +=
-                                    $rule->points;
+                                $result['points_awarded'] += $rule->points;
                             }
                         }
                     }

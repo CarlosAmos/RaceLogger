@@ -116,11 +116,16 @@ class EntryCarController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Remove the specified entry car and its associated data.
      */
-    public function destroy(string $id)
+    public function destroy(World $world, Season $season, SeasonEntry $seasonEntry, EntryClass $entryClass, EntryCar $entryCar)
     {
-        //
+        $entryCar->delete();
+
+        return redirect()
+            ->route('worlds.seasons.edit', [$world, $season])
+            ->with('success', 'Car removed.')
+            ->setStatusCode(303);
     }
 
     public function create_entry(        

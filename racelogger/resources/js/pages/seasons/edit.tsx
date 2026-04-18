@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head, useForm, Link } from '@inertiajs/react';
+import { Head, useForm, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -154,6 +154,8 @@ export default function SeasonEdit({
     tab: initialTab,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>((initialTab as Tab) ?? 'circuits');
+    const [teamSearch, setTeamSearch] = useState('');
+    const [teamSort, setTeamSort] = useState<'latest' | 'az' | 'za'>('latest');
     const [circuits, setCircuits] = useState<CircuitRow[]>(() => circuitsFromCalendar(calendarRaces));
     const [classes, setClasses] = useState(() =>
         season.season_classes.map((c) => ({ name: c.name }))
@@ -446,11 +448,49 @@ export default function SeasonEdit({
                                 </Button>
                             </div>
 
+                            {season.season_entries.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        placeholder="Search teams..."
+                                        value={teamSearch}
+                                        onChange={(e) => setTeamSearch(e.target.value)}
+                                        className="max-w-sm"
+                                    />
+                                    <select
+                                        value={teamSort}
+                                        onChange={(e) => setTeamSort(e.target.value as 'latest' | 'az' | 'za')}
+                                        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                    >
+                                        <option value="latest">Latest</option>
+                                        <option value="az">A → Z</option>
+                                        <option value="za">Z → A</option>
+                                    </select>
+                                </div>
+                            )}
+
                             {season.season_entries.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">No teams entered yet.</p>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    {season.season_entries.map((entry) => (
+                                    {season.season_entries.filter((entry) => {
+                                        const q = teamSearch.toLowerCase();
+                                        if (!q) return true;
+                                        if ((entry.display_name ?? '').toLowerCase().includes(q)) return true;
+                                        if ((entry.entrant?.name ?? '').toLowerCase().includes(q)) return true;
+                                        return entry.entry_classes.some((ec) =>
+                                            ec.entry_cars.some((car) =>
+                                                car.car_number.toLowerCase().includes(q) ||
+                                                car.drivers.some((d) =>
+                                                    `${d.first_name} ${d.last_name}`.toLowerCase().includes(q)
+                                                )
+                                            )
+                                        );
+                                    }).sort((a, b) => {
+                                        if (teamSort === 'latest') return b.id - a.id;
+                                        const nameA = (a.display_name ?? a.entrant?.name ?? '').toLowerCase();
+                                        const nameB = (b.display_name ?? b.entrant?.name ?? '').toLowerCase();
+                                        return teamSort === 'az' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+                                    }).map((entry) => (
                                         <div key={entry.id} className="rounded-xl border border-border bg-card p-4">
                                             <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
                                                 <div className="flex items-center gap-2">
@@ -469,19 +509,50 @@ export default function SeasonEdit({
                                                         +
                                                     </Link>
                                                 </div>
-                                                {entry.constructor && (
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {entry.constructor.name}
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    {entry.constructor && (
+                                                        <span className="text-sm text-muted-foreground">
+                                                            {entry.constructor.name}
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        title="Remove team from season"
+                                                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                                                        onClick={() => {
+                                                            if (!confirm(`Remove "${entry.display_name ?? entry.entrant?.name}" from this season? This will also delete all their cars and driver assignments.`)) return;
+                                                            router.delete(
+                                                                `/worlds/${worlds.id}/seasons/${season.id}/season-entries/${entry.id}`,
+                                                                { preserveScroll: true }
+                                                            );
+                                                        }}
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                        <span>Remove team</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="flex flex-wrap gap-3">
                                                 {entry.entry_classes.flatMap((ec) =>
                                                     ec.entry_cars.map((car) => (
                                                         <div
                                                             key={car.id}
-                                                            className="flex flex-col items-center rounded-xl border border-border bg-background p-3 w-44"
+                                                            className="relative flex flex-col items-center rounded-xl border border-border bg-background p-3 w-44"
                                                         >
+                                                            <button
+                                                                type="button"
+                                                                title="Remove car"
+                                                                className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-destructive"
+                                                                onClick={() => {
+                                                                    if (!confirm(`Remove car #${car.car_number} from this entry?`)) return;
+                                                                    router.delete(
+                                                                        `/worlds/${worlds.id}/seasons/${season.id}/season-entries/${entry.id}/entry-classes/${ec.id}/entry-cars/${car.id}`,
+                                                                        { preserveScroll: true }
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
                                                             <span className="text-xs italic text-muted-foreground mb-1">
                                                                 {ec.race_class.name}
                                                             </span>
@@ -498,12 +569,31 @@ export default function SeasonEdit({
                                                             <span className="text-3xl font-bold">
                                                                 #{car.car_number}
                                                             </span>
-                                                            <Link
-                                                                href={entryCarDriversRoutes.edit({ world: worlds.id, season: season.id, seasonEntry: entry.id, entryClass: ec.id, entryCar: car.id }).url}
-                                                                className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                                            >
-                                                                <Pencil className="h-3 w-3" /> Drivers
-                                                            </Link>
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                                <Link
+                                                                    href={entryCarDriversRoutes.edit({ world: worlds.id, season: season.id, seasonEntry: entry.id, entryClass: ec.id, entryCar: car.id }).url}
+                                                                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                                                >
+                                                                    <Pencil className="h-3 w-3" /> Drivers
+                                                                </Link>
+                                                                {car.drivers.length > 0 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Clear all drivers"
+                                                                        className="flex items-center text-muted-foreground hover:text-destructive"
+                                                                        onClick={() => {
+                                                                            if (!confirm(`Clear all drivers from car #${car.car_number}?`)) return;
+                                                                            router.post(
+                                                                                entryCarDriversRoutes.update({ world: worlds.id, season: season.id, seasonEntry: entry.id, entryClass: ec.id, entryCar: car.id }).url,
+                                                                                { drivers: [] },
+                                                                                { preserveScroll: true }
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <X className="h-3 w-3" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                             <div className="mt-2 flex flex-col items-center gap-0.5">
                                                                 {car.drivers.length > 0 ? (
                                                                     car.drivers.map((d) => (

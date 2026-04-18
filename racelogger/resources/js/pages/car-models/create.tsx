@@ -11,6 +11,8 @@ import worldsCarModels from '@/routes/worlds/constructors/car-models';
 interface Engine {
     id: number;
     name: string;
+    capacity: string | null;
+    configuration: string | null;
 }
 
 interface Constructor {
@@ -92,9 +94,14 @@ export default function CarModelCreate({ world, constructor: ctor, engines }: Pr
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                             <option value="">— No engine —</option>
-                            {engines.map((e) => (
-                                <option key={e.id} value={e.id}>{e.name}</option>
-                            ))}
+                            {engines.map((e) => {
+                                const detail = [e.capacity, e.configuration].filter(Boolean).join(' ');
+                                return (
+                                    <option key={e.id} value={e.id}>
+                                        {e.name}{detail ? ` — ${detail}` : ''}
+                                    </option>
+                                );
+                            })}
                         </select>
                         <InputError message={errors.engine_id} />
                     </div>

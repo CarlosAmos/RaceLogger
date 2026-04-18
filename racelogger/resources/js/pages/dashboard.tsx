@@ -26,7 +26,7 @@ interface UpcomingRace {
             short_name?: string;
         };
     };
-    trackLayout?: {
+    track_layout?: {
         track?: {
             name_short?: string;
         };
@@ -55,6 +55,7 @@ interface CareerEntry {
 interface ResultsGridSession {
     session_id: number;
     is_sprint: boolean;
+    session_order: number;
 }
 
 interface ResultsGridRound {
@@ -147,7 +148,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                 ) : (
                     <div className="flex flex-row gap-6">
                         {/* Calendar */}
-                        <div className="min-w-[260px]">
+                        <div className="min-w-[280px]">
                             <h4 className="mb-3 font-semibold">Calendar</h4>
                             <div className="flex flex-col gap-1">
                                 {upcomingRaces.length === 0 ? (
@@ -166,7 +167,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                             <div className="w-10 text-xs font-medium">{race.race_code}{race.endurance === 1 && <span className="ml-0.5 text-[10px] font-normal opacity-70">(E)</span>}</div>
                                             <div className="text-xs">-</div>
                                             <div className="w-14 px-1 text-xs">{raceDate}</div>
-                                            <div className="w-20 text-left text-xs font-light">{race.trackLayout?.track?.name_short}</div>
+                                            <div className="w-24 text-left text-xs font-light">{race.track_layout?.track?.name_short}</div>
                                         </div>
                                     );
                                 })}
@@ -302,7 +303,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                                     <td key={`${roundIdx}-${session.session_id}`} className={`border-r px-1 py-1 text-center leading-tight ${posCls}`} style={{ minWidth: 36 }}>
                                                                                         <span className={`block text-[10px] ${labelActive}`}>{round.race_code}</span>
                                                                                         {round.sessions.length > 1 && (
-                                                                                            <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : 'FEA'}</span>
+                                                                                            <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : `R${session.session_order}`}</span>
                                                                                         )}
                                                                                         <span className="block">{result ?? ''}</span>
                                                                                     </td>

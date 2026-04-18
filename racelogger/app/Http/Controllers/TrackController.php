@@ -32,6 +32,7 @@ class TrackController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'name_short' => 'nullable|string|max:50',
             'city' => 'nullable|string|max:255',
             'country_id' => 'nullable|exists:countries,id',
         ]);
@@ -58,6 +59,7 @@ class TrackController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'name_short' => 'nullable|string|max:50',
             'city' => 'nullable|string|max:255',
             'country_id' => 'nullable|exists:countries,id',
         ]);

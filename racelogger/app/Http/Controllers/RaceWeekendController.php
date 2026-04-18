@@ -52,30 +52,32 @@ class RaceWeekendController extends Controller
 
         $defaultTab = request('tab');
 
-        // Create race sessions if none exist
-        if ($race->raceSessions()->count() === 0) {
+        $existingNonSprint = $race->raceSessions->where('is_sprint', false);
 
-            // Sprint only applies to single-race weekends
-            if ($hasSprint == 1 && $numberOfRaces == 1) {
-                $race->raceSessions()->create([
-                    'name'         => 'Sprint',
-                    'session_order' => 0,
-                    'is_sprint'    => true,
-                    'reverse_grid' => false,
-                ]);
-            }
+        // Create sprint session if needed (single-race only)
+        if ($hasSprint == 1 && $numberOfRaces == 1 && $race->raceSessions->where('is_sprint', true)->isEmpty()) {
+            $race->raceSessions()->create([
+                'name'          => 'Sprint',
+                'session_order' => 0,
+                'is_sprint'     => true,
+                'reverse_grid'  => false,
+            ]);
+        }
 
-            for ($i = 1; $i <= $numberOfRaces; $i++) {
+        // Create any missing non-sprint race sessions up to number_of_races
+        $existingOrders = $existingNonSprint->pluck('session_order')->all();
+        for ($i = 1; $i <= $numberOfRaces; $i++) {
+            if (!in_array($i, $existingOrders)) {
                 $race->raceSessions()->create([
-                    'name'         => $numberOfRaces > 1 ? "Race $i" : 'Race',
+                    'name'          => $numberOfRaces > 1 ? "Race $i" : 'Race',
                     'session_order' => $i,
-                    'is_sprint'    => false,
-                    'reverse_grid' => false,
+                    'is_sprint'     => false,
+                    'reverse_grid'  => false,
                 ]);
             }
         }
 
-        // Reload relationship after creation
+        // Reload relationship
         $race->load('raceSessions.results');
 
         /** @var \Illuminate\Support\Collection $raceSessionsByNumber Keyed by session_order (= race number) */
