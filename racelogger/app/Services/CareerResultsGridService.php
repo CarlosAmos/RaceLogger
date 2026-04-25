@@ -90,7 +90,7 @@ class CareerResultsGridService
         // All calendar rounds (including future rounds with no sessions yet)
         $races = DB::table('calendar_races')
             ->whereIn('season_id', $seasonIds)
-            ->select(['season_id', 'round_number', 'race_code'])
+            ->select(['season_id', 'round_number', 'race_code', 'gp_name', 'special_event'])
             ->orderBy('round_number')
             ->get()
             ->groupBy('season_id');
@@ -116,11 +116,13 @@ class CareerResultsGridService
 
                 if ($roundSessions->isEmpty()) {
                     $merged->push((object) [
-                        'season_id'    => $seasonId,
-                        'round_number' => $race->round_number,
-                        'race_code'    => $race->race_code,
-                        'session_id'   => null,
-                        'is_sprint'    => null,
+                        'season_id'     => $seasonId,
+                        'round_number'  => $race->round_number,
+                        'race_code'     => $race->race_code,
+                        'gp_name'       => $race->gp_name,
+                        'special_event' => (bool) $race->special_event,
+                        'session_id'    => null,
+                        'is_sprint'     => null,
                     ]);
                 } else {
                     foreach ($roundSessions as $session) {
@@ -128,6 +130,8 @@ class CareerResultsGridService
                             'season_id'     => $seasonId,
                             'round_number'  => $race->round_number,
                             'race_code'     => $race->race_code,
+                            'gp_name'       => $race->gp_name,
+                            'special_event' => (bool) $race->special_event,
                             'session_id'    => $session->session_id,
                             'is_sprint'     => $session->is_sprint,
                             'session_order' => $session->session_order,
@@ -165,8 +169,10 @@ class CareerResultsGridService
                     $round = $row->round_number;
                     if (!isset($calendar[$round])) {
                         $calendar[$round] = [
-                            'race_code' => $row->race_code,
-                            'sessions'  => [],
+                            'race_code'     => $row->race_code,
+                            'gp_name'       => $row->gp_name,
+                            'special_event' => $row->special_event,
+                            'sessions'      => [],
                         ];
                     }
                     if ($row->session_id !== null) {

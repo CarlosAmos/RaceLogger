@@ -17,6 +17,7 @@ class CalendarRace extends Model
         'sprint_race',
         'number_of_races',
         'endurance',
+        'special_event',
     ];
 
     public function season()

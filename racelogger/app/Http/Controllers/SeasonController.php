@@ -99,6 +99,7 @@ class SeasonController extends Controller
             'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
             'circuits.*.number_of_races' => 'nullable|integer|min:1|max:99',
             'circuits.*.endurance' => 'nullable|integer|min:0|max:1',
+            'circuits.*.special_event' => 'nullable|integer|min:0|max:1',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
@@ -155,6 +156,7 @@ class SeasonController extends Controller
                     'point_system_id' => $race['point_system_id'] ?? null,
                     'number_of_races' => $race['number_of_races'] ?? 1,
                     'endurance' => $race['endurance'] ?? 0,
+                    'special_event' => $race['special_event'] ?? 0,
                 ]);
             }
 
@@ -285,6 +287,7 @@ class SeasonController extends Controller
             'circuits.*.point_system_id' => 'nullable|exists:point_systems,id',
             'circuits.*.number_of_races' => 'nullable|integer|min:1|max:99',
             'circuits.*.endurance' => 'nullable|integer|min:0|max:1',
+            'circuits.*.special_event' => 'nullable|integer|min:0|max:1',
 
             'classes' => 'nullable|array',
             'classes.*' => 'required|string|max:255',
@@ -379,6 +382,7 @@ class SeasonController extends Controller
                     'point_system_id' => $race['point_system_id'] ?? null,
                     'number_of_races' => $race['number_of_races'] ?? 1,
                     'endurance' => $race['endurance'] ?? 0,
+                    'special_event' => $race['special_event'] ?? 0,
                 ]);
             }
 

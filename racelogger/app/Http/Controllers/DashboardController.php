@@ -22,7 +22,7 @@ class DashboardController extends Controller
 
         $world = World::findOrFail($worldId);
 
-        $currentYear = $world->current_year;
+        $currentYear = $world->current_year ?? Carbon::now()->year;
 
         // Get seasons for current year with their series
         $seasons = Season::whereHas('series', function ($query) use ($worldId) {
@@ -47,6 +47,8 @@ class DashboardController extends Controller
             $myId = 194; // My Id
         } else if($worldId == 3) {
             $myId = 1569;
+        } else {
+            $myId = 2671;
         }
         
         

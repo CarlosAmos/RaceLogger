@@ -41,6 +41,7 @@ interface CalendarRace {
     race_date: string;
     sprint_race: number;
     endurance: number;
+    special_event: number;
     number_of_races: number;
     point_system_id: number | null;
     layout: {
@@ -107,6 +108,7 @@ interface CircuitRow {
     raceDate: string;
     sprintRace: boolean;
     endurance: boolean;
+    specialEvent: boolean;
     numberOfRaces: number;
     pointSystemId: string;
 }
@@ -137,6 +139,7 @@ function circuitsFromCalendar(calendarRaces: CalendarRace[]): CircuitRow[] {
         raceDate: race.race_date,
         sprintRace: race.sprint_race === 1,
         endurance: race.endurance === 1,
+        specialEvent: race.special_event === 1,
         numberOfRaces: race.number_of_races ?? 1,
         pointSystemId: race.point_system_id ? String(race.point_system_id) : '',
     }));
@@ -183,6 +186,7 @@ export default function SeasonEdit({
                 raceDate: '',
                 sprintRace: false,
                 endurance: false,
+                specialEvent: false,
                 numberOfRaces: 1,
                 pointSystemId: '',
             },
@@ -220,6 +224,7 @@ export default function SeasonEdit({
                 race_date: c.raceDate,
                 sprint_race: c.sprintRace ? 1 : 0,
                 endurance: c.endurance ? 1 : 0,
+                special_event: c.specialEvent ? 1 : 0,
                 number_of_races: c.numberOfRaces,
                 point_system_id: c.pointSystemId || null,
             })),
@@ -349,6 +354,14 @@ export default function SeasonEdit({
                                                     onChange={(e) => updateCircuit(i, { endurance: e.target.checked })}
                                                 />
                                                 <span className="italic">Endurance</span>
+                                            </label>
+                                            <label className="flex items-center gap-1.5 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={c.specialEvent}
+                                                    onChange={(e) => updateCircuit(i, { specialEvent: e.target.checked })}
+                                                />
+                                                <span className="italic">Special Event</span>
                                             </label>
                                             <div className="flex items-center gap-1.5 text-sm">
                                                 <span className="italic">Races</span>
