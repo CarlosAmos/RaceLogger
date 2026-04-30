@@ -9,6 +9,7 @@ class SeasonClass extends Model
     protected $fillable = [
         'season_id',
         'name',
+        'sub_class',
         'display_order',
     ];
 

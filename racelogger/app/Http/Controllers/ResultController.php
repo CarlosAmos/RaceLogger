@@ -37,7 +37,7 @@ class ResultController extends Controller
             'lap_time_ms' => 'nullable|integer',
             'points_awarded' => 'nullable|numeric',
         ]);
-
+        
         Result::create($validated);
 
         return redirect()->route('results.index')

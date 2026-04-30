@@ -11,7 +11,7 @@ import * as racesWeekend from '@/routes/races/weekend';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Driver { id: number; first_name: string; last_name: string }
-interface RaceClass { id: number; name: string; display_order: number }
+interface RaceClass { id: number; name: string; display_order: number; sub_class?: string | null }
 interface EntryClassRelation {
     id: number;
     race_class: RaceClass | null;
@@ -61,11 +61,16 @@ interface CalendarRace {
     race_code: string;
     season_id: number;
     number_of_races: number;
+    endurance: number;
     season: Season;
     entry_cars: EntryCar[];
     race_sessions: RaceSession[];
     qualifying_sessions: QualifyingSession[];
 }
+
+interface AccQualEntry { race_number: number; best_lap_ms: number | null; cup_category?: number | null }
+interface AccRaceEntry { race_number: number; lap_count: number; fastest_lap_ms: number | null; gap_ms: number | null; gap_laps: number | null }
+interface AccSessionData { qualifying?: Record<number, AccQualEntry[]>; race?: Record<number, AccRaceEntry[]> }
 
 interface Props {
     race: CalendarRace;
@@ -74,6 +79,7 @@ interface Props {
     raceSessionsByNumber: Record<number, RaceSession>;
     sprintRaceSession: RaceSession | null;
     hasSprint: string | null;
+    accSessionData?: AccSessionData;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,6 +95,22 @@ function buildRaceCarGroups(entryCars: EntryCar[]): ClassGroup[] {
             groups.set(rc.id, { classId: rc.id, className: rc.name, displayOrder: rc.display_order, cars: [] });
         }
         groups.get(rc.id)!.cars.push(car);
+    }
+    return [...groups.values()]
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map(g => ({ ...g, cars: [...g.cars].sort((a, b) => a.car_number - b.car_number) }));
+}
+
+/** Qualifying groups: classes with the same name are merged into one table. */
+function buildQualCarGroups(entryCars: EntryCar[]): ClassGroup[] {
+    const groups = new Map<string, ClassGroup>();
+    for (const car of entryCars) {
+        const rc = car.entry_class?.race_class;
+        if (!rc) continue;
+        if (!groups.has(rc.name)) {
+            groups.set(rc.name, { classId: rc.id, className: rc.name, displayOrder: rc.display_order, cars: [] });
+        }
+        groups.get(rc.name)!.cars.push(car);
     }
     return [...groups.values()]
         .sort((a, b) => a.displayOrder - b.displayOrder)
@@ -286,6 +308,7 @@ export default function ManageWeekend({
     raceSessionsByNumber,
     sprintRaceSession,
     hasSprint,
+    accSessionData,
 }: Props) {
     const showSprint   = hasSprint === '1' || hasSprint === 1 as unknown;
     const numberOfRaces = race.number_of_races ?? 1;
@@ -293,6 +316,7 @@ export default function ManageWeekend({
 
     const seasonCarGroups = useMemo(() => buildSeasonCarGroups(race), []);
     const raceCarGroups   = useMemo(() => buildRaceCarGroups(race.entry_cars ?? []), [race.entry_cars]);
+    const qualCarGroups   = useMemo(() => buildQualCarGroups(race.entry_cars ?? []), [race.entry_cars]);
 
     const [activeTab, setActiveTab] = useState<string>(defaultTab ?? 'participants');
     const [selectedCarIds, setSelectedCarIds] = useState<Set<number>>(
@@ -314,7 +338,7 @@ export default function ManageWeekend({
         const result: Record<number, Record<string, QualSlot>> = {};
         for (let rn = 1; rn <= numberOfRaces; rn++) {
             const sessions = (race.qualifying_sessions ?? []).filter(s => (s.race_number ?? 1) === rn);
-            result[rn] = buildQualData(raceCarGroups, sessions);
+            result[rn] = buildQualData(qualCarGroups, sessions);
         }
         return result;
     });
@@ -338,6 +362,57 @@ export default function ManageWeekend({
     const submitUrl = racesWeekend.update(race.id, { query: { has_sprint: hasSprint ?? 0 } }).url;
     const form = useForm({});
 
+    const CUP_CATEGORY_LABEL: Record<number, string> = { 0: 'Pro', 1: 'Pro-Am', 2: 'Am', 3: 'Silver' };
+
+    function autoAssignFromAcc() {
+        if (!accSessionData?.qualifying) return;
+
+        // Collect unique raceNumber → cupCategory across all qualifying sessions
+        const accCarMap = new Map<number, number | null>();
+        for (const session of Object.values(accSessionData.qualifying)) {
+            for (const entry of session) {
+                if (!accCarMap.has(entry.race_number)) {
+                    accCarMap.set(entry.race_number, entry.cup_category ?? null);
+                }
+            }
+        }
+
+        if (accCarMap.size === 0) return;
+
+        const matchedIds = new Set<number>();
+
+        for (const [raceNumber, cupCategory] of accCarMap) {
+            const targetSubClass = cupCategory !== null ? (CUP_CATEGORY_LABEL[cupCategory] ?? null) : null;
+            let matched = false;
+
+            // Prefer matching by car_number + sub_class (handles same car_number in different classes)
+            if (targetSubClass !== null) {
+                for (const group of seasonCarGroups) {
+                    for (const car of group.cars) {
+                        if (Number(car.car_number) === raceNumber &&
+                            car.entry_class?.race_class?.sub_class === targetSubClass) {
+                            matchedIds.add(car.id);
+                            matched = true;
+                        }
+                    }
+                }
+            }
+
+            // Fall back to car_number only when sub_class is not available
+            if (!matched) {
+                for (const group of seasonCarGroups) {
+                    for (const car of group.cars) {
+                        if (Number(car.car_number) === raceNumber) {
+                            matchedIds.add(car.id);
+                        }
+                    }
+                }
+            }
+        }
+
+        setSelectedCarIds(new Set(matchedIds));
+    }
+
     function submit(action: 'save' | 'complete' = 'save') {
         const raceNumber = raceNumberFromTab(activeTab);
 
@@ -357,7 +432,7 @@ export default function ManageWeekend({
                 qualifying: {
                     format: qualFormat,
                     sessions: Array.from({ length: qualFormat }, (_, si) => ({
-                        results: raceCarGroups.flatMap((group, gi) =>
+                        results: qualCarGroups.flatMap((group, gi) =>
                             group.cars.map((_, posIdx) => {
                                 const pos  = posIdx + 1;
                                 const slot = qualData[`${si}:${gi}:${pos}`];
@@ -432,7 +507,7 @@ export default function ManageWeekend({
             ...prev,
             [raceNum]: {
                 ...prev[raceNum],
-                [key]: { entryCarId: '', bestLap: '', ...prev[raceNum]?.[key], ...patch },
+                [key]: { ...(prev[raceNum]?.[key] ?? { entryCarId: '', bestLap: '' }), ...patch },
             },
         }));
     }
@@ -446,6 +521,118 @@ export default function ManageWeekend({
 
     function setSprintSlot(index: number, patch: Partial<RaceSlot>) {
         setSprintData(prev => prev.map((r, i) => i === index ? { ...r, ...patch } : r));
+    }
+
+    /**
+     * Import a single qualifying session from ACC JSON into the form.
+     * fileIndex = the Qualifying_N.json number (1-based, sequential across the whole weekend).
+     * si        = the session slot index (0-based) within the qualifying panel to fill.
+     */
+    /**
+     * For endurance qualifying: average best_lap_ms across all ACC sessions per car,
+     * sort within each class group, and populate a single qualifying session.
+     */
+    function importAverageQualFromAcc(raceNum: number) {
+        const sessions = Object.values(accSessionData?.qualifying ?? {});
+        if (sessions.length === 0) return;
+
+        // Sum best_lap_ms per car number across all sessions (skip nulls/invalid)
+        const lapSums = new Map<number, { total: number; count: number }>();
+        for (const session of sessions) {
+            for (const entry of session) {
+                if (!entry.best_lap_ms) continue;
+                if (!lapSums.has(entry.race_number)) {
+                    lapSums.set(entry.race_number, { total: 0, count: 0 });
+                }
+                const s = lapSums.get(entry.race_number)!;
+                s.total += entry.best_lap_ms;
+                s.count += 1;
+            }
+        }
+
+        const avgMap = new Map<number, number>();
+        for (const [raceNumber, { total, count }] of lapSums) {
+            avgMap.set(raceNumber, Math.round(total / count));
+        }
+
+        const patch: Record<string, QualSlot> = {};
+        const si = 0;
+
+        for (let gi = 0; gi < qualCarGroups.length; gi++) {
+            const group = qualCarGroups[gi];
+            const carsWithTimes = group.cars.map(car => ({
+                car,
+                avgMs: avgMap.get(Number(car.car_number)) ?? null,
+            }));
+
+            // Sort ascending by average; cars with no time go to the bottom
+            carsWithTimes.sort((a, b) => {
+                if (a.avgMs === null && b.avgMs === null) return 0;
+                if (a.avgMs === null) return 1;
+                if (b.avgMs === null) return -1;
+                return a.avgMs - b.avgMs;
+            });
+
+            carsWithTimes.forEach(({ car, avgMs }, posIdx) => {
+                patch[`${si}:${gi}:${posIdx + 1}`] = {
+                    entryCarId: String(car.id),
+                    bestLap: avgMs !== null ? msToLap(avgMs) : '',
+                };
+            });
+        }
+
+        setQualFormatByRace(prev => ({ ...prev, [raceNum]: 1 }));
+        setQualDataByRace(prev => ({ ...prev, [raceNum]: patch }));
+    }
+
+    function importQualSessionFromAcc(raceNum: number, si: number, fileIndex: number) {
+        console.log('[ACC Import] accSessionData:', accSessionData);
+        console.log('[ACC Import] fileIndex:', fileIndex, 'accLines:', accSessionData?.qualifying?.[fileIndex]);
+        console.log('[ACC Import] entry_cars car_numbers:', race.entry_cars?.map(c => c.car_number));
+        const accLines = accSessionData?.qualifying?.[fileIndex];
+        if (!accLines?.length) { console.log('[ACC Import] no accLines, aborting'); return; }
+        const groupPositions: Record<number, number> = {};
+        const patch: Record<string, QualSlot> = {};
+        for (const line of accLines) {
+            const car = race.entry_cars?.find(c => Number(c.car_number) === line.race_number);
+            console.log('[ACC Import] line race_number:', line.race_number, '-> car found:', car?.id);
+            if (!car) continue;
+            const gi = qualCarGroups.findIndex(g => g.cars.some(c => c.id === car.id));
+            if (gi === -1) continue;
+            groupPositions[gi] = (groupPositions[gi] ?? 0) + 1;
+            patch[`${si}:${gi}:${groupPositions[gi]}`] = {
+                entryCarId: String(car.id),
+                bestLap: msToLap(line.best_lap_ms),
+            };
+        }
+        setQualDataByRace(prev => ({
+            ...prev,
+            [raceNum]: { ...prev[raceNum], ...patch },
+        }));
+    }
+
+    function importRaceFromAcc(raceNum: number) {
+        const accLines = accSessionData?.race?.[raceNum];
+        if (!accLines?.length) return;
+        const total = raceCarGroups.reduce((s, g) => s + g.cars.length, 0);
+        const newData: RaceSlot[] = Array.from({ length: total }, () => ({
+            entryCarId: '', status: 'finished', laps: '', gap: '', fastestLap: '',
+        }));
+        accLines.forEach((line, idx) => {
+            if (idx >= total) return;
+            const car = race.entry_cars?.find(c => Number(c.car_number) === line.race_number);
+            newData[idx] = {
+                entryCarId: car ? String(car.id) : '',
+                status: 'finished',
+                laps: String(line.lap_count),
+                fastestLap: msToLap(line.fastest_lap_ms),
+                gap: idx === 0 ? '' : (
+                    line.gap_laps ? `+${line.gap_laps}L` :
+                    line.gap_ms   ? msToLap(line.gap_ms)  : ''
+                ),
+            };
+        });
+        setRaceDataByRace(prev => ({ ...prev, [raceNum]: newData }));
     }
 
     const seasonId = race.season_id;
@@ -519,7 +706,14 @@ export default function ManageWeekend({
                 {/* ── PARTICIPANTS ── */}
                 {activeTab === 'participants' && (
                     <div className="flex flex-col gap-6">
-                        <h3 className="text-lg font-semibold">Select Race Participants</h3>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">Select Race Participants</h3>
+                            {accSessionData?.qualifying && Object.keys(accSessionData.qualifying).length > 0 && (
+                                <Button type="button" variant="outline" size="sm" onClick={autoAssignFromAcc}>
+                                    Auto-Assign from ACC
+                                </Button>
+                            )}
+                        </div>
                         {seasonCarGroups.map((group) => (
                             <div key={group.classId} className="rounded-xl border border-border bg-card p-4 shadow-sm">
                                 {seasonCarGroups.length > 1 && (
@@ -576,7 +770,20 @@ export default function ManageWeekend({
                         }
                         qualData={qualDataByRace[activeRaceNum] ?? {}}
                         setQualSlot={(si, gi, pos, patch) => setQualSlot(activeRaceNum, si, gi, pos, patch)}
-                        raceCarGroups={raceCarGroups}
+                        raceCarGroups={qualCarGroups}
+                        onImportAccSession={(si) => {
+                            const fileIndex = (activeRaceNum - 1) * (qualFormatByRace[activeRaceNum] ?? 1) + si + 1;
+                            importQualSessionFromAcc(activeRaceNum, si, fileIndex);
+                        }}
+                        hasAccDataForSession={(si) => {
+                            const fileIndex = (activeRaceNum - 1) * (qualFormatByRace[activeRaceNum] ?? 1) + si + 1;
+                            return !!(accSessionData?.qualifying?.[fileIndex]?.length);
+                        }}
+                        onImportAccAverage={
+                            race.endurance === 1 && Object.keys(accSessionData?.qualifying ?? {}).length > 1
+                                ? () => importAverageQualFromAcc(activeRaceNum)
+                                : undefined
+                        }
                     />
                 )}
 
@@ -597,6 +804,7 @@ export default function ManageWeekend({
                         classGroups={raceCarGroups}
                         data={raceDataByRace[activeRaceNum] ?? []}
                         onUpdate={(idx, patch) => setRaceSlot(activeRaceNum, idx, patch)}
+                        onImportAcc={accSessionData?.race?.[activeRaceNum]?.length ? () => importRaceFromAcc(activeRaceNum) : undefined}
                     />
                 )}
 
@@ -634,6 +842,9 @@ interface QualifyingPanelProps {
     qualData: Record<string, QualSlot>;
     setQualSlot: (si: number, gi: number, pos: number, patch: Partial<QualSlot>) => void;
     raceCarGroups: ClassGroup[];
+    onImportAccSession?: (si: number) => void;
+    hasAccDataForSession?: (si: number) => boolean;
+    onImportAccAverage?: () => void;
 }
 
 function QualifyingPanel({
@@ -643,10 +854,13 @@ function QualifyingPanel({
     qualData,
     setQualSlot,
     raceCarGroups,
+    onImportAccSession,
+    hasAccDataForSession,
+    onImportAccAverage,
 }: QualifyingPanelProps) {
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Format</label>
                     <select
@@ -660,13 +874,25 @@ function QualifyingPanel({
                         <option value={4}>Q1 + Q2 + Q3 + Q4</option>
                     </select>
                 </div>
+                {onImportAccAverage && (
+                    <Button type="button" variant="outline" size="sm" onClick={onImportAccAverage}>
+                        Import ACC Average (Endurance)
+                    </Button>
+                )}
             </div>
 
             {Array.from({ length: qualFormat }, (_, si) => {
                 const sessionName = qualFormat === 1 ? 'Qualifying' : `Q${si + 1}`;
                 return (
                     <div key={si} className="rounded-xl border border-border bg-card shadow-sm">
-                        <div className="border-b border-border px-4 py-2 font-semibold">{sessionName}</div>
+                        <div className="flex items-center justify-between border-b border-border px-4 py-2">
+                            <span className="font-semibold">{sessionName}</span>
+                            {onImportAccSession && hasAccDataForSession?.(si) && (
+                                <Button type="button" variant="outline" size="sm" onClick={() => onImportAccSession(si)}>
+                                    Import from ACC
+                                </Button>
+                            )}
+                        </div>
                         <div className="p-4">
                             {raceCarGroups.map((group, gi) => {
                                 const selectedInGroup = new Set(
@@ -753,16 +979,24 @@ interface RaceResultsGridProps {
     classGroups: ClassGroup[];
     data: RaceSlot[];
     onUpdate: (index: number, patch: Partial<RaceSlot>) => void;
+    onImportAcc?: () => void;
 }
 
-function RaceResultsGrid({ title, classGroups, data, onUpdate }: RaceResultsGridProps) {
+function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc }: RaceResultsGridProps) {
     const allCars        = classGroups.flatMap(g => g.cars);
     const totalPositions = allCars.length;
     const selectedCarIds = new Set(data.map(r => r.entryCarId).filter(Boolean));
 
     return (
         <div className="rounded-xl border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-4 py-2 font-semibold">{title}</div>
+            <div className="flex items-center justify-between border-b border-border px-4 py-2">
+                <span className="font-semibold">{title}</span>
+                {onImportAcc && (
+                    <Button type="button" variant="outline" size="sm" onClick={onImportAcc}>
+                        Import from ACC
+                    </Button>
+                )}
+            </div>
             <div className="overflow-x-auto p-4">
                 <table className="w-full text-sm">
                     <thead>

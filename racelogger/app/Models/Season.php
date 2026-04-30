@@ -10,7 +10,8 @@ class Season extends Model
         'series_id',
         'year',
         'point_system_id',
-        'is_simulated' => 'boolean',
+        'replace_driver_id',
+        'substitute_driver_id',
     ];
 
     protected $casts = [
@@ -63,6 +64,17 @@ class Season extends Model
     {
         return $this->belongsTo(World::class);
     }
-    
+
+    /** Driver being replaced in the substitution rule. */
+    public function replaceDriver()
+    {
+        return $this->belongsTo(Driver::class, 'replace_driver_id');
+    }
+
+    /** Driver substituting in place of replaceDriver. */
+    public function substituteDriver()
+    {
+        return $this->belongsTo(Driver::class, 'substitute_driver_id');
+    }
 }
 

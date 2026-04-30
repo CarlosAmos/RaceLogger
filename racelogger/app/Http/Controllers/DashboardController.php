@@ -6,6 +6,8 @@ use App\Models\World;
 use App\Models\Series;
 use App\Models\Season;
 use App\Models\Driver;
+use App\Models\Entrant;
+use App\Models\EntryCar;
 use App\Models\CalendarRace;
 use App\Models\SeasonEntry;
 use App\Models\ResultDriver;
@@ -47,6 +49,8 @@ class DashboardController extends Controller
             $myId = 194; // My Id
         } else if($worldId == 3) {
             $myId = 1569;
+        } else if($worldId == 5) {
+            $myId = 2672;
         } else {
             $myId = 2671;
         }
@@ -58,7 +62,6 @@ class DashboardController extends Controller
         $careerMap   = $service->getCareerStructure($myId, $worldId);
         $resultsGrid = $gridService->getResultsGrid($myId, $worldId);
 
-        //dd($careerMap);
         return Inertia::render('dashboard', compact(
             'world',
             'currentYear',
@@ -67,6 +70,98 @@ class DashboardController extends Controller
             'careerMap',
             'resultsGrid'
         ));
+    }
+
+    /**
+     * Find the first unlocked ACC calendar race, auto-insert new drivers,
+     * and return a list of cars whose team or car number is not yet in the DB.
+     */
+    private function resolveAccImport(int $worldId): array
+    {
+        $race = CalendarRace::where('is_locked', 0)
+            ->whereHas('season.series', fn($q) => $q->where('world_id', $worldId)->where('game', 'acc'))
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if (!$race) {
+            return ['race' => null, 'unmatched' => []];
+        }
+
+        $folder = public_path("acc_races/{$race->id}");
+
+        if (!is_dir($folder)) {
+            return ['race' => null, 'unmatched' => []];
+        }
+
+        $qualFile = $race->number_of_races > 1
+            ? $folder . '/Qualifying_1.json'
+            : $folder . '/Qualifying.json';
+
+        if (!file_exists($qualFile)) {
+            return ['race' => null, 'unmatched' => []];
+        }
+
+        $raw = file_get_contents($qualFile);
+
+        // ACC exports UTF-16 LE (with or without BOM)
+        if (substr($raw, 0, 2) === "\xFF\xFE") {
+            $raw = substr($raw, 2);
+        }
+        $raw = mb_convert_encoding($raw, 'UTF-8', 'UTF-16LE');
+
+        $data = json_decode($raw, true);
+
+        if (!isset($data['snapShot']['leaderBoardLines'])) {
+            return ['race' => null, 'unmatched' => []];
+        }
+
+        $seasonId = $race->season_id;
+        $unmatched = [];
+
+        foreach ($data['snapShot']['leaderBoardLines'] as $line) {
+            $car      = $line['car'];
+            $teamName = $car['teamName'];
+            $carNo    = (string) $car['raceNumber'];
+
+            // Auto-insert any drivers not yet in the world
+            $drivers = [];
+            foreach ($car['drivers'] as $d) {
+                Driver::firstOrCreate(
+                    ['world_id' => $worldId, 'first_name' => $d['firstName'], 'last_name' => $d['lastName']],
+                    ['country_id' => null]
+                );
+                $drivers[] = ['first_name' => $d['firstName'], 'last_name' => $d['lastName']];
+            }
+
+            $teamMatched = Entrant::where('world_id', $worldId)->where('name', $teamName)->exists()
+                || EntryCar::where('livery_name', $teamName)
+                    ->whereHas('entryClass.seasonEntry', fn($q) => $q->where('season_id', $seasonId))
+                    ->exists();
+
+            $carMatched = EntryCar::where('car_number', $carNo)
+                ->whereHas('entryClass.seasonEntry', fn($q) => $q->where('season_id', $seasonId))
+                ->exists();
+
+            if (!$teamMatched || !$carMatched) {
+                $unmatched[] = [
+                    'car_number'   => $carNo,
+                    'team_name'    => $teamName,
+                    'drivers'      => $drivers,
+                    'team_matched' => $teamMatched,
+                    'car_matched'  => $carMatched,
+                ];
+            }
+        }
+
+        return [
+            'race' => [
+                'id'         => $race->id,
+                'gp_name'    => $race->gp_name,
+                'race_code'  => $race->race_code,
+                'round'      => $race->round_number,
+            ],
+            'unmatched' => $unmatched,
+        ];
     }
 
     public function getDriverSeasonResults($driverId, $worldId)

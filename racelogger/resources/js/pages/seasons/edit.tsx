@@ -14,6 +14,7 @@ import entryCarDriversRoutes from '@/routes/entry-cars/drivers';
 interface Series {
     id: number;
     name: string;
+    game: string | null;
 }
 
 interface TrackLayout {
@@ -58,7 +59,13 @@ interface CalendarRace {
 interface SeasonClass {
     id: number;
     name: string;
+    sub_class: string | null;
     display_order: number;
+}
+
+interface ClassGroup {
+    name: string;
+    subClasses: string[];
 }
 
 interface Driver {
@@ -76,7 +83,7 @@ interface EntryCar {
 
 interface EntryClass {
     id: number;
-    race_class: { id: number; name: string };
+    race_class: { id: number; name: string; sub_class: string | null };
     entry_cars: EntryCar[];
 }
 
@@ -93,11 +100,14 @@ interface Season {
     year: number;
     series_id: number;
     point_system_id: number | null;
+    replace_driver_id: number | null;
+    substitute_driver_id: number | null;
     season_classes: SeasonClass[];
     season_entries: SeasonEntry[];
 }
 
 interface CircuitRow {
+    id?: number;
     layoutId: number;
     trackName: string;
     layoutName: string;
@@ -123,12 +133,14 @@ interface Props {
     pointSystems: PointSystem[];
     worlds: { id: number };
     tab: string;
+    drivers: Driver[];
 }
 
 type Tab = 'circuits' | 'classes' | 'teams' | 'points' | 'basic';
 
 function circuitsFromCalendar(calendarRaces: CalendarRace[]): CircuitRow[] {
     return calendarRaces.map((race) => ({
+        id: race.id,
         layoutId: race.track_layout_id,
         trackName: race.layout.track.name,
         layoutName: race.layout.name,
@@ -155,19 +167,28 @@ export default function SeasonEdit({
     pointSystems,
     worlds,
     tab: initialTab,
+    drivers,
 }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>((initialTab as Tab) ?? 'circuits');
     const [teamSearch, setTeamSearch] = useState('');
     const [teamSort, setTeamSort] = useState<'latest' | 'az' | 'za'>('latest');
     const [circuits, setCircuits] = useState<CircuitRow[]>(() => circuitsFromCalendar(calendarRaces));
-    const [classes, setClasses] = useState(() =>
-        season.season_classes.map((c) => ({ name: c.name }))
-    );
+    const [classes, setClasses] = useState<ClassGroup[]>(() => {
+        const groups: Record<string, string[]> = {};
+        for (const c of season.season_classes) {
+            if (!groups[c.name]) groups[c.name] = [];
+            if (c.sub_class) groups[c.name].push(c.sub_class);
+        }
+        return Object.entries(groups).map(([name, subClasses]) => ({ name, subClasses }));
+    });
 
     const form = useForm({
         series_id: String(seriesId),
         year: String(defaultYear),
         point_system_id: season.point_system_id ? String(season.point_system_id) : '',
+        game: series.find((s) => s.id === Number(seriesId))?.game ?? '',
+        replace_driver_id: season.replace_driver_id ? String(season.replace_driver_id) : '',
+        substitute_driver_id: season.substitute_driver_id ? String(season.substitute_driver_id) : '',
         circuits: [] as any[],
         classes: [] as string[],
     });
@@ -202,22 +223,46 @@ export default function SeasonEdit({
     }
 
     function addClass() {
-        setClasses([...classes, { name: '' }]);
+        setClasses([...classes, { name: '', subClasses: [] }]);
     }
 
-    function updateClass(index: number, name: string) {
-        setClasses(classes.map((c, i) => (i === index ? { name } : c)));
+    function updateClassName(index: number, name: string) {
+        setClasses(classes.map((c, i) => (i === index ? { ...c, name } : c)));
     }
 
     function removeClass(index: number) {
         setClasses(classes.filter((_, i) => i !== index));
     }
 
+    function addSubClass(classIndex: number) {
+        setClasses(classes.map((c, i) =>
+            i === classIndex ? { ...c, subClasses: [...c.subClasses, ''] } : c
+        ));
+    }
+
+    function updateSubClass(classIndex: number, subIndex: number, value: string) {
+        setClasses(classes.map((c, i) =>
+            i === classIndex
+                ? { ...c, subClasses: c.subClasses.map((s, j) => (j === subIndex ? value : s)) }
+                : c
+        ));
+    }
+
+    function removeSubClass(classIndex: number, subIndex: number) {
+        setClasses(classes.map((c, i) =>
+            i === classIndex
+                ? { ...c, subClasses: c.subClasses.filter((_, j) => j !== subIndex) }
+                : c
+        ));
+    }
+
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         form.transform((data) => ({
             ...data,
+            game: data.game || null,
             circuits: circuits.map((c) => ({
+                id: c.id ?? null,
                 layout_id: c.layoutId,
                 gp_name: c.gpName,
                 race_code: c.raceCode.toUpperCase(),
@@ -228,7 +273,13 @@ export default function SeasonEdit({
                 number_of_races: c.numberOfRaces,
                 point_system_id: c.pointSystemId || null,
             })),
-            classes: classes.map((c) => c.name).filter(Boolean),
+            classes: classes
+                .filter((g) => g.name)
+                .flatMap((g) =>
+                    g.subClasses.length > 0
+                        ? g.subClasses.map((sub) => ({ name: g.name, sub_class: sub || null }))
+                        : [{ name: g.name, sub_class: null }]
+                ),
         }));
         form.put(seasons.update(season.id).url);
     }
@@ -423,22 +474,55 @@ export default function SeasonEdit({
                                     No classes defined. A default "Overall" class will be used.
                                 </p>
                             )}
-                            {classes.map((c, i) => (
-                                <div key={i} className="flex items-center gap-2">
-                                    <Input
-                                        value={c.name}
-                                        onChange={(e) => updateClass(i, e.target.value)}
-                                        placeholder="Class name"
-                                        className="w-64"
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeClass(i)}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
+                            {classes.map((group, i) => (
+                                <div key={i} className="flex flex-col gap-1.5">
+                                    {/* Main class row */}
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={group.name}
+                                            onChange={(e) => updateClassName(i, e.target.value)}
+                                            placeholder="Class name (e.g. GT3)"
+                                            className="w-64"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => addSubClass(i)}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            <Plus className="mr-1 h-3 w-3" />
+                                            Add sub-class
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => removeClass(i)}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    {/* Sub-class rows — indented */}
+                                    {group.subClasses.map((sub, j) => (
+                                        <div key={j} className="flex items-center gap-2 pl-8">
+                                            <div className="w-px self-stretch bg-border" />
+                                            <Input
+                                                value={sub}
+                                                onChange={(e) => updateSubClass(i, j, e.target.value)}
+                                                placeholder="Sub-class (e.g. Pro, Pro-Am)"
+                                                className="w-56"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeSubClass(i, j)}
+                                            >
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    ))}
                                 </div>
                             ))}
                             <Button type="button" variant="outline" size="sm" onClick={addClass} className="w-fit">
@@ -567,7 +651,7 @@ export default function SeasonEdit({
                                                                 <X className="h-3 w-3" />
                                                             </button>
                                                             <span className="text-xs italic text-muted-foreground mb-1">
-                                                                {ec.race_class.name}
+                                                                {ec.race_class.name}{ec.race_class.sub_class ? ` - ${ec.race_class.sub_class}` : ''}
                                                             </span>
                                                             {car.car_model && (
                                                                 <>
@@ -688,7 +772,10 @@ export default function SeasonEdit({
                                 <Label>Series</Label>
                                 <select
                                     value={form.data.series_id}
-                                    onChange={(e) => form.setData('series_id', e.target.value)}
+                                    onChange={(e) => {
+                                        const newGame = series.find((s) => s.id === Number(e.target.value))?.game ?? '';
+                                        form.setData({ ...form.data, series_id: e.target.value, game: newGame });
+                                    }}
                                     className="rounded-md border border-border bg-background px-3 py-2 text-sm"
                                     required
                                 >
@@ -716,6 +803,57 @@ export default function SeasonEdit({
                                 {form.errors.year && (
                                     <p className="text-sm text-destructive">{form.errors.year}</p>
                                 )}
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Game</Label>
+                                <select
+                                    value={form.data.game}
+                                    onChange={(e) => form.setData('game', e.target.value)}
+                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">Other</option>
+                                    <option value="acc">Assetto Corsa Competizione</option>
+                                    <option value="lmu">Le Mans Ultimate</option>
+                                    <option value="ac_evo">Assetto Corsa Evo</option>
+                                </select>
+                                {form.errors.game && (
+                                    <p className="text-sm text-destructive">{form.errors.game}</p>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Replace Driver</Label>
+                                <p className="text-xs text-muted-foreground">When assigning cars from ACC import, this driver will be swapped out.</p>
+                                <select
+                                    value={form.data.replace_driver_id}
+                                    onChange={(e) => form.setData('replace_driver_id', e.target.value)}
+                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">— None —</option>
+                                    {drivers.map((d) => (
+                                        <option key={d.id} value={String(d.id)}>
+                                            {d.first_name} {d.last_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Substitute Driver</Label>
+                                <p className="text-xs text-muted-foreground">This driver will replace the one above during ACC car assignment.</p>
+                                <select
+                                    value={form.data.substitute_driver_id}
+                                    onChange={(e) => form.setData('substitute_driver_id', e.target.value)}
+                                    className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">— None —</option>
+                                    {drivers.map((d) => (
+                                        <option key={d.id} value={String(d.id)}>
+                                            {d.first_name} {d.last_name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     )}

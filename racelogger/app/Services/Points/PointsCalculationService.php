@@ -25,6 +25,7 @@ class PointsCalculationService
             foreach ($results as &$result) {
                 $result['points_awarded'] = 0;
             }
+            unset($result);
             return;
         }
 
@@ -69,7 +70,9 @@ class PointsCalculationService
 
             $result['points_awarded'] = $points;
         }
- 
+        unset($result);
+
+
         /*
         |--------------------------------------------------------------------------
         | 2️⃣ Qualifying Points (Final Session Only)
@@ -119,6 +122,7 @@ class PointsCalculationService
                                 $result['points_awarded'] += $rule->points;
                             }
                         }
+                        unset($result);
                     }
 
                     $classQualifyingPositions[$classId]++;
@@ -131,6 +135,7 @@ class PointsCalculationService
         | 3️⃣ Fastest Lap Bonus
         |--------------------------------------------------------------------------
         */
+
 
         if ($fastestLapRule) {
 
@@ -168,7 +173,74 @@ class PointsCalculationService
                         $fastestLapRule->points;
                 }
             }
+            unset($result);
         }
+
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 4️⃣ Sub-class Points (delta from class points, swapping race position component)
+        |--------------------------------------------------------------------------
+        | For entries with a sub_class_position, points_awarded used class_position for
+        | race pts. We swap just that component; qualifying and FL bonuses are inherited.
+        */
+
+        // Track race-position-only points per entry car
+        $classPosPoints    = []; // entry_car_id → pts from class_position
+        $subClassPosPoints = []; // entry_car_id → pts from sub_class_position
+
+        $ko = 0;
+        foreach ($results as $result) {
+
+            if (empty($result['entry_car_id']) || ($result['status'] ?? '') !== 'finished') {
+                continue;
+            }
+
+            $id = $result['entry_car_id'];
+             $ko++;
+
+
+
+            if (!empty($result['class_position'])) {
+                // if ($result['entry_car_id'] == 3749) {
+                //     error_log("*******************************1 HERE Id: {$id}");
+                //     error_log(json_encode($results));
+                //     error_log("*******************************2 HERE Id: {$id}");
+                // }
+                $rule = $raceRules->firstWhere('position', $result['class_position']);
+                $classPosPoints[$id] = $rule ? (float) $rule->points : 0;
+
+
+            }
+
+            if (!is_null($result['sub_class_position'] ?? null)) {
+                $rule = $raceRules->firstWhere('position', $result['sub_class_position']);
+                $subClassPosPoints[$id] = $rule ? (float) $rule->points : 0;
+
+                if ($result['entry_car_id'] == 3776) {
+                    
+                }
+            }
+        }
+
+        foreach ($results as &$result) {
+            if (empty($result['entry_car_id'])) {
+                continue;
+            }
+
+            if (is_null($result['sub_class_position'] ?? null)) {
+                $result['sub_class_points_awarded'] = null;
+                continue;
+            }
+
+            $id          = $result['entry_car_id'];
+            $classPts    = $classPosPoints[$id]    ?? 0;
+            $subClassPts = $subClassPosPoints[$id] ?? 0;
+
+            $result['sub_class_points_awarded'] = (float) $result['points_awarded'] - $classPts + $subClassPts;
+        }
+        unset($result);
     }
 
     protected function calculateQualifyingPoints($race, $qualifyingRules)

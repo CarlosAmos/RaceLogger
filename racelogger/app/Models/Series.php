@@ -10,6 +10,7 @@ class Series extends Model
         'world_id',
         'name',
         'is_multiclass',
+        'game',
     ];
 
     protected $casts = [

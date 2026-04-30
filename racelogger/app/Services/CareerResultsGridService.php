@@ -69,7 +69,11 @@ class CareerResultsGridService
                 'eng.name as engine_name',
                 'eng.capacity as engine_capacity',
                 'eng.configuration as engine_configuration',
+                'sc.id as season_class_id',
                 'sc.name as class_name',
+                'sc.sub_class',
+                'sc.display_order',
+                'r.sub_class_position',
                 'ecl.id as entry_class_id',
             ])
             ->orderBy('s.year')
@@ -146,24 +150,25 @@ class CareerResultsGridService
 
     /**
      * Build the grid structure: series → seasons → entries → results.
+     * Seasons with sub-classes (display_order != 1) also populate sub_cups sections.
      */
     private function buildGrid(Collection $results, Collection $calendars): array
     {
         $grid = [];
 
         foreach ($results->groupBy('series_id') as $seriesResults) {
-            $first      = $seriesResults->first();
-            $seriesName = $first->series_name;
+            $first        = $seriesResults->first();
+            $seriesName   = $first->series_name;
             $isMulticlass = (bool) $first->is_multiclass;
             $isSpec       = ($first->series_short_name === 'F2');
 
-            $seasons = [];
+            $seasons    = [];
+            $subCupData = []; // sub_class label → ['label', 'seasons']
 
             foreach ($seriesResults->groupBy('season_id') as $seasonId => $seasonResults) {
                 $seasonFirst = $seasonResults->first();
 
-                // Build ordered calendar: round_number → { race_code, sessions[] }
-                // sessions[] is empty for rounds not yet played
+                // Build ordered calendar (same as before)
                 $calendar = [];
                 foreach ($calendars->get($seasonId, collect()) as $row) {
                     $round = $row->round_number;
@@ -185,31 +190,62 @@ class CareerResultsGridService
                 }
                 ksort($calendar);
 
-                // Map round_number → 0-based calendar index so results align with array_values($calendar).
-                // $calendar is already ksorted, so array_keys gives rounds in order.
                 $roundToIndex = array_flip(array_keys($calendar));
 
-                // Build per-entry data (one entry per entry_class / car stint)
-                $entries = [];
-                foreach ($seasonResults->groupBy('entry_class_id') as $entryResults) {
-                    $ef = $entryResults->first();
+                $entries             = [];
+                $subCupEntriesBySeason = []; // sub_class → entries[]
+                $subCupClassIds        = []; // sub_class → season_class_id
 
-                    // result map: calendar_index → session_id → display string
+                foreach ($seasonResults->groupBy('entry_class_id') as $entryResults) {
+                    $ef           = $entryResults->first();
+                    $displayOrder = $ef->display_order;
+                    $subClass     = $ef->sub_class;
+                    $isSubCup     = ($displayOrder !== null && (int) $displayOrder !== 1 && $subClass !== null);
+
+                    // Main result map uses class_position
                     $resultMap = [];
                     foreach ($entryResults as $res) {
                         $calIdx = $roundToIndex[$res->round_number] ?? null;
                         if ($calIdx !== null) {
-                            $resultMap[$calIdx][$res->session_id] = $this->formatResult($res);
+                            $resultMap[$calIdx][$res->session_id] = $this->formatResult($res, false);
                         }
                     }
 
-                    $entries[] = [
-                        'entrant' => $ef->entrant_name,
-                        'class'   => $ef->class_name ?? '-',
-                        'chassis' => $ef->car_model_name,
-                        'engine'  => $this->formatEngine($ef),
-                        'results' => $resultMap,
+                    // Sub-class result map (only when this entry has a sub_class)
+                    $subclassResultMap = null;
+                    if ($ef->sub_class !== null) {
+                        $subclassResultMap = [];
+                        foreach ($entryResults as $res) {
+                            $calIdx = $roundToIndex[$res->round_number] ?? null;
+                            if ($calIdx !== null) {
+                                $subclassResultMap[$calIdx][$res->session_id] = $this->formatResult($res, true);
+                            }
+                        }
+                    }
+
+                    $entryArr = [
+                        'entrant'          => $ef->entrant_name,
+                        'class'            => $ef->class_name ?? '-',
+                        'chassis'          => $ef->car_model_name,
+                        'engine'           => $this->formatEngine($ef),
+                        'results'          => $resultMap,
+                        'subclass_results' => $subclassResultMap,
                     ];
+
+                    $entries[] = $entryArr;
+
+                    if ($isSubCup) {
+                        // results = class_position (display), subclass_results = sub_class_position (colour + small label)
+                        $subCupEntriesBySeason[$subClass][] = $entryArr;
+                        $subCupClassIds[$subClass]           = $ef->season_class_id;
+
+                        if (!isset($subCupData[$subClass])) {
+                            $subCupData[$subClass] = [
+                                'label'   => $seriesName . ' ' . $subClass . ' Cup',
+                                'seasons' => [],
+                            ];
+                        }
+                    }
                 }
 
                 $seasons[$seasonFirst->season_year] = [
@@ -218,15 +254,31 @@ class CareerResultsGridService
                     'calendar'  => array_values($calendar),
                     'entries'   => $entries,
                 ];
+
+                foreach ($subCupEntriesBySeason as $subClass => $subEntries) {
+                    $subCupData[$subClass]['seasons'][$seasonFirst->season_year] = [
+                        'season_id' => (int) $seasonId,
+                        'class_id'  => $subCupClassIds[$subClass],
+                        'calendar'  => array_values($calendar),
+                        'entries'   => $subEntries,
+                    ];
+                }
             }
 
             ksort($seasons);
+
+            $subCups = [];
+            foreach ($subCupData as $data) {
+                ksort($data['seasons']);
+                $subCups[] = $data;
+            }
 
             $grid[$seriesName] = [
                 'series_name'   => $seriesName,
                 'is_multiclass' => $isMulticlass,
                 'is_spec'       => $isSpec,
                 'seasons'       => $seasons,
+                'sub_cups'      => $subCups,
             ];
         }
 
@@ -235,12 +287,14 @@ class CareerResultsGridService
 
     /**
      * Format a result row into a short display string ("P3", "DNF", etc.).
-     * Uses class_position for multiclass series when available.
+     * Uses sub_class_position when $useSubClass is true, otherwise class_position.
      */
-    private function formatResult(object $result): string
+    private function formatResult(object $result, bool $useSubClass = false): string
     {
         if ($result->status === 'finished') {
-            $pos = $result->class_position ?: $result->position;
+            $pos = $useSubClass
+                ? ($result->sub_class_position ?: $result->class_position ?: $result->position)
+                : ($result->class_position ?: $result->position);
             return $pos ? (string) $pos : '-';
         }
 

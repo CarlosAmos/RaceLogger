@@ -20,11 +20,19 @@ class EntrantController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(World $world)
+    public function create(Request $request, World $world)
     {
         $countries = Country::orderBy('name')->get();
 
-        return Inertia::render('entrants/create', compact('world', 'countries'));
+        $defaultName = $request->query('name', '');
+
+        $defaultCountryId = null;
+        if ($request->has('acc_nationality')) {
+            $country = Country::where('acc_id', (int) $request->query('acc_nationality'))->first();
+            $defaultCountryId = $country?->id;
+        }
+
+        return Inertia::render('entrants/create', compact('world', 'countries', 'defaultName', 'defaultCountryId'));
     }
 
     /**

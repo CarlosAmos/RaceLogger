@@ -11,6 +11,7 @@ class Result extends Model
         'entry_car_id',
         'position',
         'class_position',
+        'sub_class_position',
         'status',
         'laps_completed',
         'gap_to_leader_ms',
@@ -18,6 +19,7 @@ class Result extends Model
         'fastest_lap_time_ms',
         'fastest_lap',
         'points_awarded',
+        'sub_class_points_awarded',
     ];
 
     public function raceSession()
@@ -28,6 +30,7 @@ class Result extends Model
     protected $casts = [
         'fastest_lap' => 'boolean',
         'points_awarded' => 'decimal:2',
+        'sub_class_points_awarded' => 'decimal:2',
     ];
 
     /*

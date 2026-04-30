@@ -43,6 +43,14 @@ interface SeasonStats {
     season_active: number;
 }
 
+interface SubClassRow {
+    class_id: number;
+    label: string;
+    stats: SeasonStats;
+    ordinal: string;
+    position: number | null;
+}
+
 interface CareerEntry {
     season_id: number;
     series_name: string;
@@ -50,6 +58,7 @@ interface CareerEntry {
     ordinal: string;
     position: number;
     stats: SeasonStats;
+    sub_class_rows: SubClassRow[];
 }
 
 interface ResultsGridSession {
@@ -71,6 +80,7 @@ interface ResultsGridSeasonEntry {
     chassis?: string;
     engine?: string;
     results: Record<number, Record<number, string | null>>;
+    subclass_results?: Record<number, Record<number, string | null>> | null;
 }
 
 interface ResultsGridSeason {
@@ -79,10 +89,20 @@ interface ResultsGridSeason {
     entries: ResultsGridSeasonEntry[];
 }
 
+interface ResultsGridSubCupSeason extends ResultsGridSeason {
+    class_id: number;
+}
+
+interface ResultsGridSubCup {
+    label: string;
+    seasons: Record<number, ResultsGridSubCupSeason>;
+}
+
 interface ResultsGridSeries {
     is_multiclass: boolean;
     is_spec: boolean;
     seasons: Record<number, ResultsGridSeason>;
+    sub_cups: ResultsGridSubCup[];
 }
 
 interface Props {
@@ -99,7 +119,7 @@ const seriesColorClass: Record<string, string> = {
     WEC: 'border-blue-700 bg-blue-700/30 text-white',
     NLS: 'border-orange-500 bg-orange-500/30',
     VLN: 'border-orange-500 bg-orange-500/30',
-    IGC: 'border-purple-600 bg-purple-600/30 text-white',
+    IGC: 'border-purple-300 bg-purple-300/30 text-white',
     F2: 'border-red-400 bg-red-400/30 text-white',
     AGT: 'border-red-400 bg-red-400/30 text-white',
     BGT: 'border-purple-600 bg-purple-600/30 text-white',
@@ -127,7 +147,6 @@ function champPositionClass(ordinal: string): string {
 }
 
 export default function Dashboard({ world, currentYear, seasons: seasonsList, upcomingRaces, careerMap, resultsGrid }: Props) {
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
@@ -209,34 +228,58 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {Object.entries(careerMap).map(([year, yearSeasons]) => (
-                                                Object.entries(yearSeasons).map(([seasonId, entry], idx) => (
-                                                    <tr key={`${year}-${seasonId}`} className="border-b hover:bg-muted/30">
-                                                        {idx === 0 && (
-                                                            <td rowSpan={Object.keys(yearSeasons).length} className="border-r bg-muted/20 px-3 py-2 text-center font-extrabold align-middle">
-                                                                {year}
+                                            {Object.entries(careerMap).map(([year, yearSeasons]) => {
+                                                type FlatRow =
+                                                    | { kind: 'main'; seasonId: string; entry: CareerEntry }
+                                                    | { kind: 'sub'; seasonId: string; entry: CareerEntry; sub: SubClassRow };
+
+                                                const flatRows: FlatRow[] = [];
+                                                Object.entries(yearSeasons).forEach(([seasonId, entry]) => {
+                                                    flatRows.push({ kind: 'main', seasonId, entry });
+                                                    (entry.sub_class_rows ?? []).forEach(sub =>
+                                                        flatRows.push({ kind: 'sub', seasonId, entry, sub })
+                                                    );
+                                                });
+
+                                                return flatRows.map((row, idx) => {
+                                                    const stats   = row.kind === 'sub' ? row.sub.stats   : row.entry.stats;
+                                                    const ordinal = row.kind === 'sub' ? row.sub.ordinal : row.entry.ordinal;
+                                                    const key     = row.kind === 'sub'
+                                                        ? `${year}-${row.seasonId}-sub-${row.sub.class_id}`
+                                                        : `${year}-${row.seasonId}`;
+
+                                                    return (
+                                                        <tr key={key} className={`border-b hover:bg-muted/30 ${row.kind === 'sub' ? 'bg-muted/5' : ''}`}>
+                                                            {idx === 0 && (
+                                                                <td rowSpan={flatRows.length} className="border-r bg-muted/20 px-3 py-2 text-center font-extrabold align-middle">
+                                                                    {year}
+                                                                </td>
+                                                            )}
+                                                            <td className="border-r px-3 py-2 font-semibold">
+                                                                {row.kind === 'sub' ? (
+                                                                    <span className="pl-4 text-xs text-muted-foreground">{row.sub.label}</span>
+                                                                ) : (
+                                                                    <Link href={`/seasons/${row.entry.season_id}`} className="text-blue-600 hover:underline">
+                                                                        {row.entry.series_name}
+                                                                    </Link>
+                                                                )}
                                                             </td>
-                                                        )}
-                                                        <td className="border-r px-3 py-2 font-semibold">
-                                                            <Link href={`/seasons/${entry.season_id}`} className="text-blue-600 hover:underline">
-                                                                {entry.series_name}
-                                                            </Link>
-                                                        </td>
-                                                        <td className="border-r px-3 py-2 italic text-muted-foreground">
-                                                            {Array.isArray(entry.teams) ? entry.teams.join(', ') : ''}
-                                                        </td>
-                                                        <td className="border-r px-3 py-2 text-center">{entry.stats.races}</td>
-                                                        <td className="border-r px-3 py-2 text-center">{entry.stats.wins}</td>
-                                                        <td className="border-r px-3 py-2 text-center">{entry.stats.poles}</td>
-                                                        <td className="border-r px-3 py-2 text-center">{entry.stats.fastest_laps}</td>
-                                                        <td className="border-r px-3 py-2 text-center">{entry.stats.podiums}</td>
-                                                        <td className="border-r px-3 py-2 text-center font-bold">{entry.stats.points}</td>
-                                                        <td className={`px-3 py-2 text-center font-black ${champPositionClass(entry.ordinal)}`}>
-                                                            {entry.ordinal}{entry.stats.season_active === 1 ? ' *' : ''}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ))}
+                                                            <td className="border-r px-3 py-2 italic text-muted-foreground">
+                                                                {row.kind === 'main' && (Array.isArray(row.entry.teams) ? row.entry.teams.join(', ') : '')}
+                                                            </td>
+                                                            <td className="border-r px-3 py-2 text-center">{stats.races}</td>
+                                                            <td className="border-r px-3 py-2 text-center">{stats.wins}</td>
+                                                            <td className="border-r px-3 py-2 text-center">{stats.poles}</td>
+                                                            <td className="border-r px-3 py-2 text-center">{stats.fastest_laps}</td>
+                                                            <td className="border-r px-3 py-2 text-center">{stats.podiums}</td>
+                                                            <td className="border-r px-3 py-2 text-center font-bold">{stats.points}</td>
+                                                            <td className={`px-3 py-2 text-center font-black ${champPositionClass(ordinal)}`}>
+                                                                {ordinal}{row.kind === 'main' && row.entry.stats.season_active === 1 ? ' *' : ''}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                });
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -246,7 +289,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                             <div className="mt-8 space-y-6">
                                 {Object.entries(resultsGrid).map(([seriesName, seriesData]) => {
                                     const maxCols = Math.max(0, ...Object.values(seriesData.seasons).map(sd =>
-                                        sd.calendar.filter(rd => !rd.special_event).reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0)
+                                        sd.calendar.reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0)
                                     ));
 
                                     // Collect all special event races across seasons for this series
@@ -285,7 +328,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                     </thead>
                                                     <tbody>
                                                         {Object.entries(seriesData.seasons).map(([year, seasonData]) => {
-                                                            const regularCalendar = seasonData.calendar.filter(rd => !rd.special_event);
+                                                            const regularCalendar = seasonData.calendar;
                                                             const seasonCols = regularCalendar.reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0);
                                                             const paddingCols = maxCols - seasonCols;
                                                             const careerEntry = careerMap[Number(year)]?.[seasonData.season_id];
@@ -307,8 +350,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                             </td>
                                                                         </>
                                                                     )}
-                                                                    {regularCalendar.map((round, _colIdx) => {
-                                                                        const origIdx = seasonData.calendar.indexOf(round);
+                                                                    {regularCalendar.map((round, origIdx) => {
                                                                         if (round.sessions.length > 0) {
                                                                             return round.sessions.map(session => {
                                                                                 const result = entry.results?.[origIdx]?.[session.session_id] ?? null;
@@ -344,49 +386,150 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                 </table>
                                             </div>
 
-                                            {/* Special Events sub-section */}
-                                            {specialEvents.length > 0 && (
-                                                <div className="mt-3">
-                                                    <h6 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Special Events</h6>
-                                                    <div className="overflow-x-auto rounded-lg border">
-                                                        <table className="w-full border-collapse text-xs">
-                                                            <thead>
-                                                                <tr className="border-b bg-muted/50">
-                                                                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Event</th>
-                                                                    <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Year</th>
-                                                                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Entrant</th>
-                                                                    {seriesData.is_multiclass && <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Class</th>}
-                                                                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Chassis / Engine</th>
-                                                                    <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Result</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {specialEvents.map(({ year, gpName, roundIdx, entries }) =>
-                                                                    entries.map((entry, entryIdx) => {
-                                                                        const round = seriesData.seasons[Number(year)].calendar[roundIdx];
-                                                                        const mainSession = round.sessions.find((s: ResultsGridSession) => !s.is_sprint) ?? round.sessions[0] ?? null;
-                                                                        const result = mainSession ? entry.results?.[roundIdx]?.[mainSession.session_id] ?? null : null;
-                                                                        const posCls = positionClass(result);
-                                                                        return (
-                                                                            <tr key={`se-${year}-${roundIdx}-${entryIdx}`} className="border-b hover:bg-muted/30">
-                                                                                <td className="border-r px-3 py-2 font-medium">{gpName}</td>
-                                                                                <td className="border-r px-3 py-2 text-center font-extrabold">{year}</td>
+                                            {/* Special Events — one table per event, named by gpName */}
+                                            {specialEvents.length > 0 && (() => {
+                                                const byEvent = specialEvents.reduce<Record<string, typeof specialEvents>>((acc, ev) => {
+                                                    (acc[ev.gpName] ??= []).push(ev);
+                                                    return acc;
+                                                }, {});
+                                                return Object.entries(byEvent).map(([gpName, events]) => {
+                                                    const hasSubClass = events.some(ev =>
+                                                        ev.entries.some(e => e.subclass_results != null)
+                                                    );
+                                                    return (
+                                                        <div key={gpName} className="mt-3">
+                                                            <h6 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{gpName}</h6>
+                                                            <div className="overflow-x-auto rounded-lg border">
+                                                                <table className="w-full border-collapse text-xs">
+                                                                    <thead>
+                                                                        <tr className="border-b bg-muted/50">
+                                                                            <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Year</th>
+                                                                            <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Entrant</th>
+                                                                            {seriesData.is_multiclass && <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Class</th>}
+                                                                            <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Chassis / Engine</th>
+                                                                            {hasSubClass && <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Result</th>}
+                                                                            <th className="px-3 py-2 text-center font-semibold text-muted-foreground">{hasSubClass ? 'Overall' : 'Result'}</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {events.map(({ year, roundIdx, entries }) =>
+                                                                            entries.map((entry, entryIdx) => {
+                                                                                const round = seriesData.seasons[Number(year)].calendar[roundIdx];
+                                                                                const mainSession = round.sessions.find((s: ResultsGridSession) => !s.is_sprint) ?? round.sessions[0] ?? null;
+                                                                                const overallResult = mainSession ? entry.results?.[roundIdx]?.[mainSession.session_id] ?? null : null;
+                                                                                const subResult = (hasSubClass && mainSession && entry.subclass_results)
+                                                                                    ? entry.subclass_results?.[roundIdx]?.[mainSession.session_id] ?? null
+                                                                                    : null;
+                                                                                return (
+                                                                                    <tr key={`se-${year}-${roundIdx}-${entryIdx}`} className="border-b hover:bg-muted/30">
+                                                                                        <td className="border-r px-3 py-2 text-center font-extrabold">{year}</td>
+                                                                                        <td className="border-r px-3 py-2 italic text-muted-foreground">{entry.entrant}</td>
+                                                                                        {seriesData.is_multiclass && <td className="border-r px-2 py-2 text-center">{entry.class}</td>}
+                                                                                        <td className="border-r px-3 py-2 text-[11px]">
+                                                                                            {entry.chassis}<br />
+                                                                                            <span className="italic text-muted-foreground">{entry.engine}</span>
+                                                                                        </td>
+                                                                                        {hasSubClass && <td className={`border-r px-2 py-2 text-center font-bold ${positionClass(subResult)}`}>{subResult ?? '-'}</td>}
+                                                                                        <td className={`px-2 py-2 text-center font-bold ${positionClass(overallResult)}`}>{overallResult ?? '-'}</td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })
+                                                                        )}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
+
+                                            {/* Sub-cup sections (e.g. "World GT Gold Cup") */}
+                                            {(seriesData.sub_cups ?? []).map(subCup => {
+                                                const subMaxCols = Math.max(0, ...Object.values(subCup.seasons).map(sd =>
+                                                    sd.calendar.filter(rd => !rd.special_event).reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0)
+                                                ));
+                                                return (
+                                                    <div key={subCup.label} className="mt-4">
+                                                        <h6 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{subCup.label}</h6>
+                                                        <div className="overflow-x-auto rounded-lg border">
+                                                            <table className="w-full border-collapse text-xs">
+                                                                <thead>
+                                                                    <tr className="border-b bg-muted/50">
+                                                                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Year</th>
+                                                                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Entrant</th>
+                                                                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Chassis / Engine</th>
+                                                                        {Array.from({ length: maxCols }, (_, i) => (
+                                                                            <th key={i} className="px-2 py-2 text-center font-semibold text-muted-foreground">{i + 1}</th>
+                                                                        ))}
+                                                                        <th className="px-2 py-2 text-center font-semibold text-muted-foreground">Place</th>
+                                                                        <th className="px-2 py-2 text-center font-semibold text-muted-foreground">Points</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {Object.entries(subCup.seasons).map(([year, seasonData]) => {
+                                                                        //const regularCalendar = seasonData.calendar.filter(rd => !rd.special_event);
+                                                                        const regularCalendar = seasonData.calendar;
+                                                                        const seasonCols = regularCalendar.reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0);
+                                                                        const paddingCols = subMaxCols - seasonCols;
+                                                                        const subClassRow = careerMap[Number(year)]?.[seasonData.season_id]?.sub_class_rows?.find(
+                                                                            sub => sub.class_id === seasonData.class_id
+                                                                        );
+                                                                        const champPos = subClassRow?.ordinal ?? '-';
+                                                                        const points = subClassRow?.stats?.points ?? '-';
+
+                                                                        return seasonData.entries.map((entry, entryIdx) => (
+                                                                            <tr key={`${year}-${entryIdx}`} className="border-b hover:bg-muted/30">
+                                                                                <td className="border-r bg-muted/20 px-3 py-2 text-center font-extrabold align-middle">{year}</td>
                                                                                 <td className="border-r px-3 py-2 italic text-muted-foreground">{entry.entrant}</td>
-                                                                                {seriesData.is_multiclass && <td className="border-r px-2 py-2 text-center">{entry.class}</td>}
                                                                                 <td className="border-r px-3 py-2 text-[11px]">
                                                                                     {entry.chassis}<br />
                                                                                     <span className="italic text-muted-foreground">{entry.engine}</span>
                                                                                 </td>
-                                                                                <td className={`px-2 py-2 text-center font-bold ${posCls}`}>{result ?? '-'}</td>
+                                                                                {regularCalendar.map((round, _colIdx) => {
+                                                                                    const origIdx = seasonData.calendar.indexOf(round);
+                                                                                    if (round.sessions.length > 0) {
+                                                                                        return round.sessions.map(session => {
+                                                                                            const overallResult = entry.results?.[origIdx]?.[session.session_id] ?? null;
+                                                                                            const subResult = entry.subclass_results?.[origIdx]?.[session.session_id] ?? null;
+                                                                                            const posCls = positionClass(subResult ?? overallResult);
+                                                                                            const labelActive = overallResult !== null ? 'text-black' : 'text-muted-foreground';
+                                                                                            return (
+                                                                                                <td key={`${origIdx}-${session.session_id}`} className={`border-r px-1 py-1 text-center leading-tight ${posCls}`} style={{ minWidth: 36 }}>
+                                                                                                    <span className={`block text-[10px] ${labelActive}`}>{round.race_code}</span>
+                                                                                                    {round.sessions.length > 1 && (
+                                                                                                        <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : `R${session.session_order}`}</span>
+                                                                                                    )}
+                                                                                                    <div class="flex w-full text-center justify-center">                                                                                                    
+                                                                                                        <span className="block">{overallResult ?? ''}</span>
+                                                                                                        {subResult !== null && subResult !== overallResult && (
+                                                                                                            <span className="block text-[9px] opacity-70">({subResult})</span>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                </td>
+                                                                                            );
+                                                                                        });
+                                                                                    } else {
+                                                                                        return (
+                                                                                            <td key={origIdx} className="border-r px-1 py-1 text-center" style={{ minWidth: 36 }}>
+                                                                                                <span className="block text-[10px] text-muted-foreground">{round.race_code}</span>
+                                                                                            </td>
+                                                                                        );
+                                                                                    }
+                                                                                })}
+                                                                                {Array.from({ length: paddingCols }, (_, i) => (
+                                                                                    <td key={`pad-${i}`} className="border-r px-1 py-1" />
+                                                                                ))}
+                                                                                <td className={`border-r px-2 py-2 text-center font-black ${champPositionClass(champPos)}`}>{champPos}</td>
+                                                                                <td className="px-2 py-2 text-center font-bold">{points}</td>
                                                                             </tr>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </tbody>
-                                                        </table>
+                                                                        ));
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                );
+                                            })}
                                         </div>
                                     );
                                 })}

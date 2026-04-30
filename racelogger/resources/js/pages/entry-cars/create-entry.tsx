@@ -22,6 +22,7 @@ interface CarModel {
 interface SeasonClass {
     id: number;
     name: string;
+    sub_class: string | null;
 }
 
 interface SeasonEntry {
@@ -94,7 +95,7 @@ export default function EntryCarCreateEntry({ world, season, seasonEntry, carMod
                         >
                             <option value="">— Select class —</option>
                             {entryClasses.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
+                                <option key={c.id} value={c.id}>{c.name}{c.sub_class ? ` - ${c.sub_class}` : ''}</option>
                             ))}
                         </select>
                         <InputError message={errors.entry_class_id} />

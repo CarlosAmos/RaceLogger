@@ -98,6 +98,8 @@ class RaceWeekendController extends Controller
             }
         }
 
+        $accSessionData = $this->parseAccSessionData($race->id, $numberOfRaces);
+
         return Inertia::render('races/weekend/manage', [
             'race'                 => $race,
             'defaultTab'           => $defaultTab,
@@ -105,6 +107,7 @@ class RaceWeekendController extends Controller
             'raceSessionsByNumber' => $raceSessionsByNumber,
             'sprintRaceSession'    => $sprintRaceSession,
             'hasSprint'            => $hasSprint,
+            'accSessionData'       => $accSessionData,
         ]);
     }
 
@@ -208,6 +211,7 @@ class RaceWeekendController extends Controller
             | Race Results  (key: 'race' for single, 'r_N' for multi)
             |------------------------------------------------------------------
             */
+            error_log("MADE IT TO HERE");
             if ($submittedTab === 'race' || str_starts_with($submittedTab, 'r_')) {
                 $raceNumber   = str_starts_with($submittedTab, 'r_')
                     ? (int) substr($submittedTab, 2)
@@ -243,7 +247,7 @@ class RaceWeekendController extends Controller
             return redirect()
                 ->route('seasons.show', [
                     'season' => $race->season->id,
-                    'tab'    => 'results',
+                    'tab'    => 'calender',
                 ])
                 ->with('success', 'Weekend completed successfully.');
         }
@@ -255,6 +259,84 @@ class RaceWeekendController extends Controller
                 'has_sprint' => $hasSprint,
             ])
             ->with('success', ucfirst(str_replace('_', ' ', $submittedTab)) . ' saved successfully.');
+    }
+
+    /**
+     * Read and parse ACC result JSON files for a race.
+     *
+     * Returns:
+     *   [
+     *     'qualifying' => [ 1 => [...lines], 2 => [...lines], ... ],  // keyed by file number
+     *     'race'       => [ 1 => [...lines], 2 => [...lines], ... ],  // keyed by race number
+     *   ]
+     *
+     * Qualifying file N maps to the N-th qualifying session across the whole weekend,
+     * following ACC's sequential numbering (Qualifying_1.json, Qualifying_2.json, …).
+     */
+    protected function parseAccSessionData(int $raceId, int $numberOfRaces): array
+    {
+        $accSessionData = ['qualifying' => [], 'race' => []];
+        $accDir = public_path("acc_races/{$raceId}");
+
+        if (!is_dir($accDir)) {
+            return $accSessionData;
+        }
+
+        // Read every Qualifying_N.json found (up to 20 to avoid infinite scan)
+        for ($n = 1; $n <= 20; $n++) {
+            $qualFile = "{$accDir}/Qualifying_{$n}.json";
+            if (!file_exists($qualFile)) {
+                break;
+            }
+            $raw   = $this->decodeUtf16(file_get_contents($qualFile));
+            $data  = json_decode($raw, true);
+            $lines = $data['snapShot']['leaderBoardLines'] ?? [];
+            $accSessionData['qualifying'][$n] = array_map(fn($line) => [
+                'race_number'  => $line['car']['raceNumber'],
+                'best_lap_ms'  => ($line['timing']['bestLap'] ?? 0) > 0 ? $line['timing']['bestLap'] : null,
+                'cup_category' => $line['car']['cupCategory'] ?? null,
+            ], $lines);
+        }
+
+        // Read Race_N.json for each race number
+        for ($n = 1; $n <= $numberOfRaces; $n++) {
+            $raceFile = "{$accDir}/Race_{$n}.json";
+            if (!file_exists($raceFile)) {
+                continue;
+            }
+            $raw         = $this->decodeUtf16(file_get_contents($raceFile));
+            $data        = json_decode($raw, true);
+            $lines       = $data['snapShot']['leaderBoardLines'] ?? [];
+            $leaderLaps  = $lines[0]['timing']['lapCount']  ?? 0;
+            $leaderTotal = $lines[0]['timing']['totalTime'] ?? 0;
+            $accSessionData['race'][$n] = array_map(fn($line) => [
+                'race_number'    => $line['car']['raceNumber'],
+                'lap_count'      => $line['timing']['lapCount'] ?? 0,
+                'fastest_lap_ms' => ($line['timing']['bestLap'] ?? 0) > 0 ? $line['timing']['bestLap'] : null,
+                'gap_ms'         => ($line['timing']['lapCount'] ?? 0) >= $leaderLaps && ($line['timing']['totalTime'] ?? 0) > $leaderTotal
+                    ? ($line['timing']['totalTime'] - $leaderTotal)
+                    : null,
+                'gap_laps'       => $leaderLaps - ($line['timing']['lapCount'] ?? 0) > 0
+                    ? $leaderLaps - $line['timing']['lapCount']
+                    : null,
+            ], $lines);
+        }
+
+        return $accSessionData;
+    }
+
+    /**
+     * Decode a UTF-16 LE or BE byte string (with or without BOM) to UTF-8.
+     */
+    protected function decodeUtf16(string $raw): string
+    {
+        if (substr($raw, 0, 2) === "\xFF\xFE") {
+            return mb_convert_encoding(substr($raw, 2), 'UTF-8', 'UTF-16LE');
+        }
+        if (substr($raw, 0, 2) === "\xFE\xFF") {
+            return mb_convert_encoding(substr($raw, 2), 'UTF-8', 'UTF-16BE');
+        }
+        return mb_convert_encoding($raw, 'UTF-8', 'UTF-16LE');
     }
 
     /**

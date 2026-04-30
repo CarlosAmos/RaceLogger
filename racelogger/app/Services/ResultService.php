@@ -33,7 +33,7 @@ class ResultService
         $raceSession = \App\Models\RaceSession::with([
             'calendarRace.season.pointSystem.bonusRules',
             'calendarRace.pointSystem.bonusRules',
-            'calendarRace.entryCars.entryClass',
+            'calendarRace.entryCars.entryClass.raceClass',
             'calendarRace.qualifyingSessions.results'
         ])->findOrFail($data['race_session_id']);
 
@@ -44,12 +44,15 @@ class ResultService
                 'race' => 'This race is locked and cannot be modified.'
             ]);
         }
-
+        
         $this->validateRaceResults($race, $data);
         $this->calculateClassPositions($race, $data['results']);
         // Calculate points
+        
         $this->pointsService->calculateWeekendPoints($race, $data['results'],0);
         
+        
+
         DB::transaction(function () use ($data, $raceSession) {
 
             // Delete old results for this session only
@@ -64,7 +67,7 @@ class ResultService
                 unset($resultData['drivers']);
 
                 $resultData['race_session_id'] = $raceSession->id;
-
+                
                 $result = Result::create($resultData);
 
                 // Freeze drivers directly from entry car
@@ -87,12 +90,12 @@ class ResultService
         $raceSession = \App\Models\RaceSession::with([
             'calendarRace.season.pointSystem.bonusRules',
             'calendarRace.pointSystem.bonusRules',
-            'calendarRace.entryCars.entryClass',
+            'calendarRace.entryCars.entryClass.raceClass',
             'calendarRace.qualifyingSessions.results'
         ])->findOrFail($data['race_session_id']);
 
         $race = $raceSession->calendarRace;
-        
+
         if ($race->isLocked()) {
             throw ValidationException::withMessages([
                 'race' => 'This race is locked and cannot be modified.'
@@ -151,8 +154,9 @@ class ResultService
         | First Pass — Validate & Detect Fastest Lap
         |--------------------------------------------------------------------------
         */
-
+        
         foreach ($data['results'] as $index => &$result) {
+            
             // Convert fastest lap string to milliseconds
             if (!empty($result['fastest_lap'])) {
                 $result['fastest_lap_time_ms'] =
@@ -266,38 +270,6 @@ class ResultService
             $data['results'][$fastestLapCandidate['index']]['fastest_lap'] = true;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Second Pass — Compute Class Positions
-        |--------------------------------------------------------------------------
-        */
-
-        // Sort results by overall position
-        usort($data['results'], function ($a, $b) {
-            return ($a['position'] ?? 9999) <=> ($b['position'] ?? 9999);
-        });
-
-        $classPositions = [];
-
-        foreach ($data['results'] as &$result) {
-
-            if (empty($result['entry_car_id'])) {
-                continue;
-            }
-
-            $entryCar = $race->entryCars
-                ->firstWhere('id', $result['entry_car_id']);
-
-            $classId = $entryCar->entryClass->race_class_id;
-
-            if (!isset($classPositions[$classId])) {
-                $classPositions[$classId] = 1;
-            }
-
-            $result['class_position'] = $classPositions[$classId];
-
-            $classPositions[$classId]++;
-        }
     }
 
     protected function freezeDriversFromEntryCar($result, int $entryCarId): void
@@ -338,37 +310,54 @@ class ResultService
 
     protected function calculateClassPositions($race, array &$results): void
     {
-        $classPositions = [];
+        // Build a lookup: race_class_id → SeasonClass (for name + sub_class)
+        $classMap = [];
+        foreach ($race->entryCars as $car) {
+            $seasonClass = $car->entryClass->raceClass ?? null;
+            if ($seasonClass) {
+                $classMap[$car->entryClass->race_class_id] = $seasonClass;
+            }
+        }
 
-        // Only classify cars that actually have a finishing position
+        // class_position  — position among ALL cars sharing the same class name
+        // sub_class_position — position within the specific sub-class (null when no sub_class)
+        $classNameCounters = [];
+        $subClassCounters  = [];
+
         $sorted = collect($results)
-            ->filter(function ($result) {
-                return !is_null($result['position']);
-            })
+            ->filter(fn($r) => !is_null($r['position']))
             ->sortBy('position')
             ->values();
 
         foreach ($sorted as $sortedResult) {
-
-            $entryCar = $race->entryCars
-                ->firstWhere('id', $sortedResult['entry_car_id']);
-
+            $entryCar = $race->entryCars->firstWhere('id', $sortedResult['entry_car_id']);
             if (!$entryCar) continue;
 
-            $classId = $entryCar->entryClass->race_class_id;
+            $classId     = $entryCar->entryClass->race_class_id;
+            $seasonClass = $classMap[$classId] ?? null;
+            $className   = $seasonClass?->name ?? "class_{$classId}";
+            $hasSubClass = !is_null($seasonClass?->sub_class);
 
-            if (!isset($classPositions[$classId])) {
-                $classPositions[$classId] = 1;
+            if (!isset($classNameCounters[$className])) {
+                $classNameCounters[$className] = 1;
+            }
+            if ($hasSubClass && !isset($subClassCounters[$classId])) {
+                $subClassCounters[$classId] = 1;
             }
 
-            // Apply class position back to original array
             foreach ($results as &$result) {
                 if ($result['entry_car_id'] == $sortedResult['entry_car_id']) {
-                    $result['class_position'] = $classPositions[$classId];
+                    $result['class_position']     = $classNameCounters[$className];
+                    $result['sub_class_position'] = $hasSubClass
+                        ? $subClassCounters[$classId]
+                        : null;
                 }
             }
 
-            $classPositions[$classId]++;
+            $classNameCounters[$className]++;
+            if ($hasSubClass) {
+                $subClassCounters[$classId]++;
+            }
         }
     }
 }

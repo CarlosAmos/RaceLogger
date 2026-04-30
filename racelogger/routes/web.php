@@ -62,6 +62,12 @@ Route::resource('track-layouts', TrackLayoutController::class);
 Route::resource('worlds.constructors', ConstructorController::class);
 Route::resource('worlds.entrants', EntrantController::class);
 Route::resource('worlds.seasons', SeasonController::class);
+Route::post('/seasons/{season}/acc/assign-car', [SeasonController::class, 'accAssignCar'])
+    ->name('seasons.acc.assign-car');
+Route::post('/seasons/{season}/acc/create-entry', [SeasonController::class, 'accCreateEntry'])
+    ->name('seasons.acc.create-entry');
+Route::post('/seasons/{season}/acc/assign-drivers', [SeasonController::class, 'accAssignDrivers'])
+    ->name('seasons.acc.assign-drivers');
 
 Route::resource(
     'worlds.seasons.season-entries',

@@ -21,9 +21,11 @@ interface World {
 interface Props {
     world: World;
     countries: Country[];
+    defaultName?: string;
+    defaultCountryId?: number | null;
 }
 
-export default function EntrantCreate({ world, countries }: Props) {
+export default function EntrantCreate({ world, countries, defaultName = '', defaultCountryId = null }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: world.name, href: '#' },
         { title: 'Teams', href: worldsConstructors.index(world.id).url },
@@ -31,8 +33,8 @@ export default function EntrantCreate({ world, countries }: Props) {
     ];
 
     const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        country_id: '',
+        name: defaultName,
+        country_id: defaultCountryId ? String(defaultCountryId) : '',
     });
 
     function submit(e: React.FormEvent) {
