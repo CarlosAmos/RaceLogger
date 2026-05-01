@@ -162,6 +162,7 @@ class SeasonController extends Controller
                     'number_of_races' => $race['number_of_races'] ?? 1,
                     'endurance' => $race['endurance'] ?? 0,
                     'special_event' => $race['special_event'] ?? 0,
+                    'stage_names' => !empty($race['stage_names']) ? $race['stage_names'] : null,
                 ]);
             }
 
@@ -263,6 +264,7 @@ class SeasonController extends Controller
 
         $calendarRaces = $season->calendarRaces()
             ->with(['layout.track.country'])
+            ->withCount('results')
             ->orderBy('round_number')
             ->get();
 
@@ -343,17 +345,6 @@ class SeasonController extends Controller
 
             DB::beginTransaction();
 
-            $hasResults = $season->calendarRaces()
-                ->whereHas('results')
-                ->exists();
-
-            if ($hasResults) {
-                DB::rollBack();
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'season' => 'Calendar cannot be modified because results already exist.',
-                ]);
-            }
-
             // Update season (WITH default point system)
             $season->update([
                 'series_id'           => $request->series_id,
@@ -421,13 +412,17 @@ class SeasonController extends Controller
                     'number_of_races'  => $race['number_of_races'] ?? 1,
                     'endurance'        => $race['endurance'] ?? 0,
                     'special_event'    => $race['special_event'] ?? 0,
+                    'stage_names'      => !empty($race['stage_names']) ? $race['stage_names'] : null,
                 ];
 
                 if (!empty($race['id'])) {
                     $calRace = CalendarRace::find($race['id']);
                     if ($calRace && $calRace->season_id === $season->id) {
-                        $calRace->update($attrs);
                         $submittedIds[] = $calRace->id;
+                        // Skip finished races — preserve their data unchanged
+                        if (!$calRace->is_locked && !$calRace->results()->exists()) {
+                            $calRace->update($attrs);
+                        }
                         continue;
                     }
                 }
@@ -436,9 +431,11 @@ class SeasonController extends Controller
                 $submittedIds[] = $created->id;
             }
 
-            // Remove calendar races that were deleted in the editor
+            // Remove calendar races that were deleted in the editor (never delete finished races)
             $season->calendarRaces()
                 ->whereNotIn('id', $submittedIds)
+                ->where('is_locked', false)
+                ->whereDoesntHave('results')
                 ->delete();
 
             DB::commit();

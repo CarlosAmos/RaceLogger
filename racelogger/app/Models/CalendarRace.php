@@ -18,7 +18,12 @@ class CalendarRace extends Model
         'number_of_races',
         'endurance',
         'special_event',
+        'stage_names',
         'is_locked',
+    ];
+
+    protected $casts = [
+        'stage_names' => 'array',
     ];
 
     public function season()

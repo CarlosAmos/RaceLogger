@@ -62,6 +62,7 @@ interface CalendarRace {
     season_id: number;
     number_of_races: number;
     endurance: number;
+    stage_names?: { name: string; point_system_id: number | null }[] | null;
     season: Season;
     entry_cars: EntryCar[];
     race_sessions: RaceSession[];
@@ -70,7 +71,7 @@ interface CalendarRace {
 
 interface AccQualEntry { race_number: number; best_lap_ms: number | null; cup_category?: number | null }
 interface AccRaceEntry { race_number: number; lap_count: number; fastest_lap_ms: number | null; gap_ms: number | null; gap_laps: number | null }
-interface AccSessionData { qualifying?: Record<number, AccQualEntry[]>; race?: Record<number, AccRaceEntry[]> }
+interface AccSessionData { qualifying?: Record<number, AccQualEntry[]>; race?: Record<number, AccRaceEntry[]>; stages?: Record<number, AccRaceEntry[]> }
 
 interface Props {
     race: CalendarRace;
@@ -79,6 +80,7 @@ interface Props {
     raceSessionsByNumber: Record<number, RaceSession>;
     sprintRaceSession: RaceSession | null;
     hasSprint: string | null;
+    stageNames?: { name: string; point_system_id: number | null }[] | null;
     accSessionData?: AccSessionData;
 }
 
@@ -211,9 +213,9 @@ function carLabel(car: EntryCar): string {
     return label;
 }
 
-/** Extract race number from a tab key like 'q_2' or 'r_3'. Returns 1 for single-race tabs. */
+/** Extract number from a tab key like 'q_2', 'r_3', or 's_1'. Returns 1 for single-race tabs. */
 function raceNumberFromTab(tab: string): number {
-    if (tab.startsWith('q_') || tab.startsWith('r_')) {
+    if (tab.startsWith('q_') || tab.startsWith('r_') || tab.startsWith('s_')) {
         return parseInt(tab.split('_')[1], 10);
     }
     return 1;
@@ -225,6 +227,10 @@ function isQualTab(tab: string): boolean {
 
 function isRaceTab(tab: string): boolean {
     return tab === 'race' || tab.startsWith('r_');
+}
+
+function isStageTab(tab: string): boolean {
+    return tab.startsWith('s_');
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -308,11 +314,14 @@ export default function ManageWeekend({
     raceSessionsByNumber,
     sprintRaceSession,
     hasSprint,
+    stageNames,
     accSessionData,
 }: Props) {
-    const showSprint   = hasSprint === '1' || hasSprint === 1 as unknown;
+    const showSprint    = hasSprint === '1' || hasSprint === 1 as unknown;
     const numberOfRaces = race.number_of_races ?? 1;
-    const multiRace    = numberOfRaces > 1;
+    const multiRace     = numberOfRaces > 1;
+    const hasStages     = !!(stageNames?.length);
+    const stageCount    = stageNames?.length ?? 0;
 
     const seasonCarGroups = useMemo(() => buildSeasonCarGroups(race), []);
     const raceCarGroups   = useMemo(() => buildRaceCarGroups(race.entry_cars ?? []), [race.entry_cars]);
@@ -343,12 +352,17 @@ export default function ManageWeekend({
         return result;
     });
 
-    // Per-race result rows
+    // Per-race / per-stage result rows
     const [raceDataByRace, setRaceDataByRace] = useState<Record<number, RaceSlot[]>>(() => {
         const result: Record<number, RaceSlot[]> = {};
-        for (let rn = 1; rn <= numberOfRaces; rn++) {
-            const session = raceSessionsByNumber?.[rn] ?? (rn === 1 ? activeRaceSession : null);
-            result[rn] = buildRaceData(raceCarGroups, session?.results ?? []);
+        const count = hasStages ? stageCount : numberOfRaces;
+        for (let n = 1; n <= count; n++) {
+            const session = raceSessionsByNumber?.[n] ?? (n === 1 && !hasStages ? activeRaceSession : null);
+            result[n] = buildRaceData(raceCarGroups, session?.results ?? []);
+        }
+        if (hasStages) {
+            const finalSession = raceSessionsByNumber?.[stageCount + 1] ?? activeRaceSession;
+            result[stageCount + 1] = buildRaceData(raceCarGroups, finalSession?.results ?? []);
         }
         return result;
     });
@@ -462,9 +476,30 @@ export default function ManageWeekend({
                 })),
             }));
 
+        } else if (isStageTab(activeTab)) {
+            const stageNum = raceNumberFromTab(activeTab);
+            const raceData = raceDataByRace[stageNum] ?? [];
+            const session  = raceSessionsByNumber?.[stageNum] ?? null;
+            form.transform(() => ({
+                submitted_tab:  activeTab,
+                action,
+                race_session_id: session?.id,
+                results: raceData.map((slot, i) => ({
+                    position:      i + 1,
+                    entry_car_id:  slot.entryCarId || null,
+                    status:        slot.status,
+                    laps_completed: slot.laps       || null,
+                    gap:           slot.gap         || null,
+                    fastest_lap:   slot.fastestLap  || null,
+                })),
+            }));
+
         } else if (isRaceTab(activeTab)) {
-            const raceData = raceDataByRace[raceNumber] ?? [];
-            const session  = raceSessionsByNumber?.[raceNumber] ?? (raceNumber === 1 ? activeRaceSession : null);
+            const dataKey  = hasStages ? stageCount + 1 : raceNumber;
+            const raceData = raceDataByRace[dataKey] ?? [];
+            const session  = hasStages
+                ? (raceSessionsByNumber?.[stageCount + 1] ?? activeRaceSession)
+                : (raceSessionsByNumber?.[raceNumber] ?? (raceNumber === 1 ? activeRaceSession : null));
             form.transform(() => ({
                 submitted_tab:  activeTab,
                 action,
@@ -611,7 +646,7 @@ export default function ManageWeekend({
         }));
     }
 
-    function importRaceFromAcc(raceNum: number) {
+    function importRaceFromAcc(raceNum: number, writeKey?: number) {
         const accLines = accSessionData?.race?.[raceNum];
         if (!accLines?.length) return;
         const total = raceCarGroups.reduce((s, g) => s + g.cars.length, 0);
@@ -632,7 +667,31 @@ export default function ManageWeekend({
                 ),
             };
         });
-        setRaceDataByRace(prev => ({ ...prev, [raceNum]: newData }));
+        setRaceDataByRace(prev => ({ ...prev, [writeKey ?? raceNum]: newData }));
+    }
+
+    function importStageFromAcc(stageNum: number) {
+        const accLines = accSessionData?.stages?.[stageNum];
+        if (!accLines?.length) return;
+        const total = raceCarGroups.reduce((s, g) => s + g.cars.length, 0);
+        const newData: RaceSlot[] = Array.from({ length: total }, () => ({
+            entryCarId: '', status: 'finished', laps: '', gap: '', fastestLap: '',
+        }));
+        accLines.forEach((line, idx) => {
+            if (idx >= total) return;
+            const car = race.entry_cars?.find(c => Number(c.car_number) === line.race_number);
+            newData[idx] = {
+                entryCarId: car ? String(car.id) : '',
+                status: 'finished',
+                laps: String(line.lap_count),
+                fastestLap: msToLap(line.fastest_lap_ms),
+                gap: idx === 0 ? '' : (
+                    line.gap_laps ? `+${line.gap_laps}L` :
+                    line.gap_ms   ? msToLap(line.gap_ms)  : ''
+                ),
+            };
+        });
+        setRaceDataByRace(prev => ({ ...prev, [stageNum]: newData }));
     }
 
     const seasonId = race.season_id;
@@ -646,7 +705,17 @@ export default function ManageWeekend({
     // Build tab list
     const tabs: { key: string; label: string; disabled?: boolean }[] = [
         { key: 'participants', label: 'Participants' },
-        ...(!multiRace
+        ...(hasStages
+            ? [
+                { key: 'qualifying', label: 'Qualifying', disabled: !participantsExist },
+                ...(stageNames ?? []).map((stage, i) => ({
+                    key: `s_${i + 1}`,
+                    label: stage.name || `Stage ${i + 1}`,
+                    disabled: !participantsExist,
+                })),
+                { key: 'race', label: 'Race Results', disabled: !participantsExist },
+              ]
+            : !multiRace
             ? [
                 { key: 'qualifying',   label: 'Qualifying',   disabled: !participantsExist },
                 ...(showSprint ? [{ key: 'sprint_race', label: 'Sprint Race', disabled: !participantsExist }] : []),
@@ -797,14 +866,29 @@ export default function ManageWeekend({
                     />
                 )}
 
-                {/* ── RACE RESULTS (single-race key: 'race', multi-race key: 'r_N') ── */}
-                {isRaceTab(activeTab) && (
+                {/* ── STAGE RESULTS (key: 's_N' for multi-stage events like Spa 24hrs) ── */}
+                {isStageTab(activeTab) && (
                     <RaceResultsGrid
-                        title={multiRace ? `Race ${activeRaceNum} Results` : 'Race Results'}
+                        title={stageNames?.[activeRaceNum - 1]?.name ?? `Stage ${activeRaceNum}`}
                         classGroups={raceCarGroups}
                         data={raceDataByRace[activeRaceNum] ?? []}
                         onUpdate={(idx, patch) => setRaceSlot(activeRaceNum, idx, patch)}
-                        onImportAcc={accSessionData?.race?.[activeRaceNum]?.length ? () => importRaceFromAcc(activeRaceNum) : undefined}
+                        onImportAcc={accSessionData?.stages?.[activeRaceNum]?.length ? () => importStageFromAcc(activeRaceNum) : undefined}
+                    />
+                )}
+
+                {/* ── RACE RESULTS (single-race key: 'race', multi-race key: 'r_N') ── */}
+                {isRaceTab(activeTab) && (
+                    <RaceResultsGrid
+                        title={hasStages || !multiRace ? 'Race Results' : `Race ${activeRaceNum} Results`}
+                        classGroups={raceCarGroups}
+                        data={raceDataByRace[hasStages ? stageCount + 1 : activeRaceNum] ?? []}
+                        onUpdate={(idx, patch) => setRaceSlot(hasStages ? stageCount + 1 : activeRaceNum, idx, patch)}
+                        onImportAcc={
+                            hasStages
+                                ? (accSessionData?.race?.[1]?.length ? () => importRaceFromAcc(1, stageCount + 1) : undefined)
+                                : (accSessionData?.race?.[activeRaceNum]?.length ? () => importRaceFromAcc(activeRaceNum) : undefined)
+                        }
                     />
                 )}
 

@@ -34,6 +34,11 @@ interface PointSystem {
     bonus_rules: { id: number; type: string; points: number }[];
 }
 
+interface StageEntry {
+    name: string;
+    point_system_id: number | null;
+}
+
 interface CalendarRace {
     id: number;
     track_layout_id: number;
@@ -44,7 +49,10 @@ interface CalendarRace {
     endurance: number;
     special_event: number;
     number_of_races: number;
+    stage_names: StageEntry[] | null;
     point_system_id: number | null;
+    is_locked: number;
+    results_count: number;
     layout: {
         id: number;
         name: string;
@@ -106,6 +114,11 @@ interface Season {
     season_entries: SeasonEntry[];
 }
 
+interface StageRow {
+    name: string;
+    pointSystemId: string;
+}
+
 interface CircuitRow {
     id?: number;
     layoutId: number;
@@ -120,7 +133,9 @@ interface CircuitRow {
     endurance: boolean;
     specialEvent: boolean;
     numberOfRaces: number;
+    stages: StageRow[];
     pointSystemId: string;
+    isLocked: boolean;
 }
 
 interface Props {
@@ -153,7 +168,14 @@ function circuitsFromCalendar(calendarRaces: CalendarRace[]): CircuitRow[] {
         endurance: race.endurance === 1,
         specialEvent: race.special_event === 1,
         numberOfRaces: race.number_of_races ?? 1,
+        stages: race.stage_names
+            ? race.stage_names.map((s) => ({
+                name: typeof s === 'string' ? s : (s.name ?? ''),
+                pointSystemId: typeof s === 'string' ? '' : (s.point_system_id ? String(s.point_system_id) : ''),
+              }))
+            : [],
         pointSystemId: race.point_system_id ? String(race.point_system_id) : '',
+        isLocked: race.is_locked === 1 || race.results_count > 0,
     }));
 }
 
@@ -209,7 +231,9 @@ export default function SeasonEdit({
                 endurance: false,
                 specialEvent: false,
                 numberOfRaces: 1,
+                stages: [],
                 pointSystemId: '',
+                isLocked: false,
             },
         ]);
     }
@@ -271,6 +295,9 @@ export default function SeasonEdit({
                 endurance: c.endurance ? 1 : 0,
                 special_event: c.specialEvent ? 1 : 0,
                 number_of_races: c.numberOfRaces,
+                stage_names: c.stages.length > 0
+                    ? c.stages.map((s) => ({ name: s.name.trim(), point_system_id: s.pointSystemId ? Number(s.pointSystemId) : null })).filter((s) => s.name)
+                    : null,
                 point_system_id: c.pointSystemId || null,
             })),
             classes: classes
@@ -333,7 +360,7 @@ export default function SeasonEdit({
                             {circuits.map((c, i) => (
                                 <div
                                     key={`${c.layoutId}-${i}`}
-                                    className="rounded-xl border border-border bg-card p-4 shadow-sm"
+                                    className={`rounded-xl border p-4 shadow-sm ${c.isLocked ? 'border-border/50 bg-muted/30 opacity-70' : 'border-border bg-card'}`}
                                 >
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -343,6 +370,7 @@ export default function SeasonEdit({
                                                 onChange={(e) => updateCircuit(i, { gpName: e.target.value })}
                                                 placeholder="Grand Prix Name"
                                                 className="w-72"
+                                                disabled={c.isLocked}
                                             />
                                             <Input
                                                 value={c.raceCode}
@@ -352,25 +380,34 @@ export default function SeasonEdit({
                                                 placeholder="CODE"
                                                 maxLength={3}
                                                 className="w-20 text-center font-semibold uppercase"
+                                                disabled={c.isLocked}
                                             />
                                             <Input
                                                 type="date"
                                                 value={c.raceDate}
                                                 onChange={(e) => updateCircuit(i, { raceDate: e.target.value })}
                                                 className="w-44"
+                                                disabled={c.isLocked}
                                             />
                                         </div>
                                         <div className="flex items-center gap-3">
+                                            {c.isLocked && (
+                                                <span className="rounded-full bg-green-600/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                                                    Completed
+                                                </span>
+                                            )}
                                             <span className="text-sm italic text-muted-foreground">
                                                 {c.city}, {c.country}
                                             </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeCircuit(i)}
-                                                className="rounded-full bg-destructive px-2 py-0.5 text-xs text-white"
-                                            >
-                                                ✕
-                                            </button>
+                                            {!c.isLocked && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCircuit(i)}
+                                                    className="rounded-full bg-destructive px-2 py-0.5 text-xs text-white"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="mt-2 flex flex-wrap items-center justify-between gap-3 pl-8">
@@ -380,7 +417,8 @@ export default function SeasonEdit({
                                                 <select
                                                     value={c.pointSystemId}
                                                     onChange={(e) => updateCircuit(i, { pointSystemId: e.target.value })}
-                                                    className="rounded-full border border-border bg-background px-2 py-0.5 text-sm"
+                                                    className="rounded-full border border-border bg-background px-2 py-0.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={c.isLocked}
                                                 >
                                                     <option value="">Season Default</option>
                                                     {pointSystems.map((ps) => (
@@ -390,31 +428,75 @@ export default function SeasonEdit({
                                                     ))}
                                                 </select>
                                             </div>
-                                            <label className="flex items-center gap-1.5 text-sm">
+                                            <label className={`flex items-center gap-1.5 text-sm ${c.isLocked ? 'cursor-not-allowed opacity-50' : ''}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={c.sprintRace}
                                                     onChange={(e) => updateCircuit(i, { sprintRace: e.target.checked })}
+                                                    disabled={c.isLocked}
                                                 />
                                                 <span className="italic">Sprint Race</span>
                                             </label>
-                                            <label className="flex items-center gap-1.5 text-sm">
+                                            <label className={`flex items-center gap-1.5 text-sm ${c.isLocked ? 'cursor-not-allowed opacity-50' : ''}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={c.endurance}
-                                                    onChange={(e) => updateCircuit(i, { endurance: e.target.checked })}
+                                                    onChange={(e) => updateCircuit(i, { endurance: e.target.checked, stages: e.target.checked ? c.stages : [] })}
+                                                    disabled={c.isLocked}
                                                 />
                                                 <span className="italic">Endurance</span>
                                             </label>
-                                            <label className="flex items-center gap-1.5 text-sm">
+                                            {c.endurance && (
+                                                <div className="flex flex-col gap-1">
+                                                    {c.stages.map((stage, si) => (
+                                                        <div key={si} className="flex items-center gap-1.5">
+                                                            <input
+                                                                type="text"
+                                                                value={stage.name}
+                                                                onChange={(e) => updateCircuit(i, { stages: c.stages.map((s, j) => j === si ? { ...s, name: e.target.value } : s) })}
+                                                                placeholder="e.g. 6hrs"
+                                                                className="w-20 rounded-md border border-border bg-background px-2 py-0.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                                                disabled={c.isLocked}
+                                                            />
+                                                            <select
+                                                                value={stage.pointSystemId}
+                                                                onChange={(e) => updateCircuit(i, { stages: c.stages.map((s, j) => j === si ? { ...s, pointSystemId: e.target.value } : s) })}
+                                                                className="rounded-full border border-border bg-background px-2 py-0.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                                                                disabled={c.isLocked}
+                                                            >
+                                                                <option value="">Race Pts</option>
+                                                                {pointSystems.map((ps) => (
+                                                                    <option key={ps.id} value={String(ps.id)}>{ps.name}</option>
+                                                                ))}
+                                                            </select>
+                                                            {!c.isLocked && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateCircuit(i, { stages: c.stages.filter((_, j) => j !== si) })}
+                                                                    className="text-muted-foreground hover:text-destructive text-xs"
+                                                                >✕</button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {!c.isLocked && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateCircuit(i, { stages: [...c.stages, { name: '', pointSystemId: '' }] })}
+                                                            className="text-xs text-primary hover:underline w-fit"
+                                                        >+ Add Stage</button>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <label className={`flex items-center gap-1.5 text-sm ${c.isLocked ? 'cursor-not-allowed opacity-50' : ''}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={c.specialEvent}
                                                     onChange={(e) => updateCircuit(i, { specialEvent: e.target.checked })}
+                                                    disabled={c.isLocked}
                                                 />
                                                 <span className="italic">Special Event</span>
                                             </label>
-                                            <div className="flex items-center gap-1.5 text-sm">
+                                            <div className={`flex items-center gap-1.5 text-sm ${c.isLocked ? 'opacity-50' : ''}`}>
                                                 <span className="italic">Races</span>
                                                 <input
                                                     type="number"
@@ -422,7 +504,8 @@ export default function SeasonEdit({
                                                     max={99}
                                                     value={c.numberOfRaces}
                                                     onChange={(e) => updateCircuit(i, { numberOfRaces: Math.max(1, parseInt(e.target.value) || 1) })}
-                                                    className="w-14 rounded-md border border-border bg-background px-2 py-0.5 text-center text-sm"
+                                                    className="w-14 rounded-md border border-border bg-background px-2 py-0.5 text-center text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={c.isLocked}
                                                 />
                                             </div>
                                         </div>

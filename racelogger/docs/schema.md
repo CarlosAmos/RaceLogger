@@ -63,6 +63,11 @@ worlds
 | race_code | string | short code e.g. "BHR" |
 | race_date | date | |
 | point_system_id | FK → point_systems | nullable; overrides season default |
+| sprint_race | boolean | |
+| number_of_races | int | multi-race weekends |
+| endurance | tinyint | 1 = endurance format |
+| special_event | boolean | non-championship round |
+| stage_names | json | nullable; array of stage labels e.g. ["6hrs","12hrs","Race"] — enables multi-stage results with s_N tab keys |
 | is_locked | boolean | prevents result edits |
 
 ---
