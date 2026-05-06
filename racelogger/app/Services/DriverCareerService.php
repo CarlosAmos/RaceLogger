@@ -131,7 +131,7 @@ class DriverCareerService
                 
                 WHERE rd.driver_id = ? 
                 AND cr.season_id = ? 
-                AND rs.name LIKE '%Race%'
+                AND rs.is_sprint = 0
                 GROUP BY cr.season_id, r.entry_car_id
             ) as season_car_stats;
     SQL;
@@ -349,7 +349,7 @@ class DriverCareerService
             WHERE rd.driver_id       = ?
               AND cr.season_id       = ?
               AND ecl.race_class_id  = ?
-              AND rs.name LIKE '%Race%'
+              AND rs.is_sprint = 0
         SQL;
 
         $result = DB::selectOne($sql, [$seasonId, $classId, $driverId, $driverId, $seasonId, $classId]);
@@ -409,7 +409,7 @@ class DriverCareerService
               AND cr.season_id      = ?
               AND ecl.race_class_id = ?
               AND cr.endurance      = ?
-              AND rs.name LIKE '%Race%'
+              AND rs.is_sprint = 0
         SQL;
 
         $result = DB::selectOne($sql, [$seasonId, $classId, $driverId, $endurance, $driverId, $seasonId, $classId, $endurance]);
@@ -456,7 +456,7 @@ class DriverCareerService
                 JOIN calendar_races cr ON rs.calendar_race_id = cr.id
                 JOIN entry_cars ec     ON r.entry_car_id      = ec.id
                 JOIN entry_classes ecl ON ec.entry_class_id   = ecl.id
-                WHERE rs.name LIKE '%Race%'
+                WHERE rs.is_sprint = 0
                   AND cr.endurance = {$endurance}
                 GROUP BY cr.season_id, rd.driver_id, ecl.race_class_id
             ) as standings
@@ -486,7 +486,7 @@ class DriverCareerService
                 JOIN entry_cars ec     ON r.entry_car_id      = ec.id
                 JOIN entry_classes ecl ON ec.entry_class_id   = ecl.id
                 JOIN season_classes sc ON ecl.race_class_id   = sc.id
-                WHERE rs.name LIKE '%Race%'
+                WHERE rs.is_sprint = 0
                   AND cr.endurance = {$endurance}
                 GROUP BY cr.season_id, rd.driver_id, sc.name
             ) as overall_standings
@@ -530,7 +530,7 @@ class DriverCareerService
                 WHERE rd.driver_id  = ?
                   AND cr.season_id  = ?
                   AND cr.endurance  = ?
-                  AND rs.name LIKE '%Race%'
+                  AND rs.is_sprint = 0
                 GROUP BY cr.season_id, r.entry_car_id
             ) AS season_car_stats
         SQL;
@@ -580,7 +580,7 @@ class DriverCareerService
                 JOIN entry_cars ec     ON r.entry_car_id      = ec.id
                 JOIN entry_classes ecl ON ec.entry_class_id   = ecl.id
                 JOIN season_classes sc ON ecl.race_class_id   = sc.id
-                WHERE rs.name LIKE '%Race%'
+                WHERE rs.is_sprint = 0
                 GROUP BY cr.season_id, rd.driver_id, sc.name
             ) as overall_standings
         "));
@@ -604,7 +604,7 @@ class DriverCareerService
                 JOIN calendar_races cr ON rs.calendar_race_id = cr.id
                 JOIN entry_cars ec     ON r.entry_car_id = ec.id
                 JOIN entry_classes ecl ON ec.entry_class_id = ecl.id
-                WHERE rs.name LIKE '%Race%'
+                WHERE rs.is_sprint = 0
                 GROUP BY cr.season_id, rd.driver_id, ecl.race_class_id
             ) as standings
         "));

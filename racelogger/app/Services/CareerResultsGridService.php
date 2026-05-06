@@ -47,7 +47,7 @@ class CareerResultsGridService
             ->leftJoin('season_classes as sc',  'ecl.race_class_id',     '=', 'sc.id')
             ->where('rd.driver_id', $driverId)
             ->where('ser.world_id', $worldId)
-            ->where('rs.name', 'LIKE', '%Race%')
+            ->where('rs.is_sprint', false)
             ->select([
                 's.id as season_id',
                 's.year as season_year',
@@ -59,6 +59,8 @@ class CareerResultsGridService
                 'cr.race_code',
                 'rs.id as session_id',
                 'rs.is_sprint',
+                'rs.session_order',
+                'rs.name as session_name',
                 'r.position',
                 'r.class_position',
                 'r.status',
@@ -103,8 +105,8 @@ class CareerResultsGridService
         $sessions = DB::table('race_sessions as rs')
             ->join('calendar_races as cr', 'rs.calendar_race_id', '=', 'cr.id')
             ->whereIn('cr.season_id', $seasonIds)
-            ->where('rs.name', 'LIKE', '%Race%')
-            ->select(['cr.season_id', 'cr.round_number', 'rs.id as session_id', 'rs.is_sprint', 'rs.session_order'])
+            ->where('rs.is_sprint', false)
+            ->select(['cr.season_id', 'cr.round_number', 'rs.id as session_id', 'rs.is_sprint', 'rs.session_order', 'rs.name as session_name'])
             ->orderBy('rs.session_order')
             ->get()
             ->groupBy(['season_id', 'round_number']);
@@ -127,6 +129,7 @@ class CareerResultsGridService
                         'special_event' => (bool) $race->special_event,
                         'session_id'    => null,
                         'is_sprint'     => null,
+                        'session_name'  => null,
                     ]);
                 } else {
                     foreach ($roundSessions as $session) {
@@ -139,6 +142,7 @@ class CareerResultsGridService
                             'session_id'    => $session->session_id,
                             'is_sprint'     => $session->is_sprint,
                             'session_order' => $session->session_order,
+                            'session_name'  => $session->session_name ?? null,
                         ]);
                     }
                 }
@@ -185,6 +189,7 @@ class CareerResultsGridService
                             'session_id'    => $row->session_id,
                             'is_sprint'     => (bool) $row->is_sprint,
                             'session_order' => $row->session_order,
+                            'name'          => $row->session_name ?? null,
                         ];
                     }
                 }

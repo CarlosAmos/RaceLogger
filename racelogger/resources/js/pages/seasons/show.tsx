@@ -72,6 +72,12 @@ interface RaceSession {
     id: number;
     is_sprint: boolean;
     session_order: number;
+    name: string | null;
+}
+
+interface StageNameEntry {
+    name: string;
+    point_system_id: number | null;
 }
 
 interface CalendarRace {
@@ -84,6 +90,7 @@ interface CalendarRace {
     race_sessions: RaceSession[];
     qualifying_sessions: QualifyingSession[];
     point_system: PointSystem | null;
+    stage_names?: StageNameEntry[] | null;
 }
 
 interface EntryCar {
@@ -440,6 +447,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                 carNumber: string;
                 raceResults: Map<number, Result>;
                 totalPoints: number;
+                totalClassPoints: number;
                 totalOverallPoints: number;
             }>;
         }>();
@@ -475,6 +483,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                             carNumber: carInfo.carNumber,
                             raceResults: new Map(),
                             totalPoints: 0,
+                            totalClassPoints: 0,
                             totalOverallPoints: 0,
                         });
                     }
@@ -482,6 +491,7 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                     const row = table.rows.get(driver.id)!;
                     row.raceResults.set(result.race_session_id, result);
                     row.totalPoints += Number((table.subClass !== null ? result.sub_class_points_awarded : result.points_awarded) ?? 0);
+                    row.totalClassPoints += Number(result.points_awarded ?? 0);
                     const effectivePtSystem = race.point_system ?? season.point_system;
                     row.totalOverallPoints += calcOverallPoints(result, effectivePtSystem);
                 }
@@ -604,9 +614,11 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                                                     >
                                                         {session.is_sprint
                                                             ? `${race.race_code}S`
-                                                            : race.race_sessions.filter(s => !s.is_sprint).length > 1
-                                                                ? `${race.race_code} R${session.session_order}${race.endurance ? ' (E)' : ''}`
-                                                                : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
+                                                            : race.stage_names?.length
+                                                                ? `${race.race_code} ${session.name ?? session.session_order}`
+                                                                : race.race_sessions.filter(s => !s.is_sprint).length > 1
+                                                                    ? `${race.race_code} ${session.session_order}${race.endurance ? ' (E)' : ''}`
+                                                                    : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
                                                     </Link>
                                                 </th>
                                             ))
@@ -795,9 +807,11 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                             >
                                 {session.is_sprint
                                     ? `${race.race_code}S`
-                                    : race.race_sessions.filter(s => !s.is_sprint).length > 1
-                                        ? `${race.race_code} R${session.session_order}${race.endurance ? ' (E)' : ''}`
-                                        : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
+                                    : race.stage_names?.length
+                                        ? `${race.race_code} ${session.name ?? session.session_order}`
+                                        : race.race_sessions.filter(s => !s.is_sprint).length > 1
+                                            ? `${race.race_code} ${session.session_order}${race.endurance ? ' (E)' : ''}`
+                                            : `${race.race_code}${race.endurance ? ' (E)' : ''}`}
                             </Link>
                         </th>
                     ))
@@ -1067,16 +1081,18 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                     mergedRows.set(driverId, {
                         ...row,
                         raceResults: new Map(row.raceResults),
-                        totalPoints: row.totalOverallPoints,
-                        totalOverallPoints: row.totalOverallPoints,
+                        totalPoints: row.totalClassPoints,
+                        totalClassPoints: row.totalClassPoints,
+                        totalOverallPoints: row.totalClassPoints,
                     });
                 } else {
                     const existing = mergedRows.get(driverId)!;
                     for (const [sessionId, result] of row.raceResults) {
                         existing.raceResults.set(sessionId, result);
                     }
-                    existing.totalPoints += row.totalOverallPoints;
-                    existing.totalOverallPoints += row.totalOverallPoints;
+                    existing.totalPoints += row.totalClassPoints;
+                    existing.totalClassPoints += row.totalClassPoints;
+                    existing.totalOverallPoints += row.totalClassPoints;
                 }
             }
         }

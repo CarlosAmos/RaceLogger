@@ -59,7 +59,7 @@ class RaceWeekendController extends Controller
         $existingOrders    = $existingNonSprint->pluck('session_order')->all();
 
         if ($hasStages) {
-            // Create a session for each intermediate stage (e.g. 6hrs, 12hrs)
+            // Create or rename a session for each intermediate stage (e.g. 6hrs, 12hrs)
             foreach ($stageNames as $idx => $stage) {
                 $stageName = is_array($stage) ? ($stage['name'] ?? '') : (string) $stage;
                 $order = $idx + 1;
@@ -70,6 +70,11 @@ class RaceWeekendController extends Controller
                         'is_sprint'     => false,
                         'reverse_grid'  => false,
                     ]);
+                } else {
+                    // Ensure name stays in sync if stages were configured after session was created
+                    $existingNonSprint
+                        ->firstWhere('session_order', $order)
+                        ?->update(['name' => $stageName]);
                 }
             }
             // Always create the final Race session after all intermediate stages
@@ -259,9 +264,15 @@ class RaceWeekendController extends Controller
                     ]);
                 }
 
+                $stageEntry = $stageNames[$stageNumber - 1] ?? null;
+                $stagePointSystemId = is_array($stageEntry)
+                    ? ($stageEntry['point_system_id'] ?? null)
+                    : null;
+
                 $resultService->saveRaceResults([
-                    'race_session_id' => $raceSessionId,
-                    'results'         => $request->input('results', []),
+                    'race_session_id'       => $raceSessionId,
+                    'results'               => $request->input('results', []),
+                    'stage_point_system_id' => $stagePointSystemId,
                 ]);
 
                 $nextTab = $stageNumber < $stageCount ? "s_" . ($stageNumber + 1) : 'race';
@@ -444,10 +455,13 @@ class RaceWeekendController extends Controller
             ];
         }
 
-        // Accumulate lap times per car in race order
+        // Accumulate lap times per car in race order; skip entries with no lapTime
         $lapsByCarId = [];
         foreach ($laps as $lap) {
-            $lapsByCarId[$lap['carId']][] = $lap['laptime'];
+            if (!isset($lap['carId'], $lap['lapTime'])) {
+                continue;
+            }
+            $lapsByCarId[$lap['carId']][] = $lap['lapTime'];
         }
 
         $stageCount = count($stageNames);

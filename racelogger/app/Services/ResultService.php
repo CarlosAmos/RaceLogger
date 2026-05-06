@@ -48,8 +48,12 @@ class ResultService
         $this->validateRaceResults($race, $data);
         $this->calculateClassPositions($race, $data['results']);
         // Calculate points
-        
-        $this->pointsService->calculateWeekendPoints($race, $data['results'],0);
+        $this->pointsService->calculateWeekendPoints(
+            $race,
+            $data['results'],
+            0,
+            $data['stage_point_system_id'] ?? null
+        );
         
         
 

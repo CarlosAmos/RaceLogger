@@ -8,11 +8,17 @@ use Illuminate\Validation\ValidationException;
 
 class PointsCalculationService
 {
-    public function calculateWeekendPoints($race, array &$results, $sprintRace): void
+    /**
+     * @param  int|null  $stagePointSystemId  Override point system for an intermediate stage.
+     */
+    public function calculateWeekendPoints($race, array &$results, $sprintRace, ?int $stagePointSystemId = null): void
     {
-        if($sprintRace == 0) {
-            $pointSystem = $race->pointSystem
-                ?? $race->season->pointSystem;
+        if ($sprintRace == 0) {
+            if ($stagePointSystemId) {
+                $pointSystem = \App\Models\PointSystem::with(['rules', 'bonusRules'])->find($stagePointSystemId);
+            } else {
+                $pointSystem = $race->pointSystem ?? $race->season->pointSystem;
+            }
         } else {
             $pointSystem = \App\Models\PointSystem::with(['rules', 'bonusRules'])->find(13);
         }

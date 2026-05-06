@@ -873,7 +873,8 @@ export default function ManageWeekend({
                         classGroups={raceCarGroups}
                         data={raceDataByRace[activeRaceNum] ?? []}
                         onUpdate={(idx, patch) => setRaceSlot(activeRaceNum, idx, patch)}
-                        onImportAcc={accSessionData?.stages?.[activeRaceNum]?.length ? () => importStageFromAcc(activeRaceNum) : undefined}
+                        onImportAcc={() => importStageFromAcc(activeRaceNum)}
+                        importAccEnabled={!!(accSessionData?.stages?.[activeRaceNum]?.length)}
                     />
                 )}
 
@@ -1064,9 +1065,10 @@ interface RaceResultsGridProps {
     data: RaceSlot[];
     onUpdate: (index: number, patch: Partial<RaceSlot>) => void;
     onImportAcc?: () => void;
+    importAccEnabled?: boolean;
 }
 
-function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc }: RaceResultsGridProps) {
+function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc, importAccEnabled = true }: RaceResultsGridProps) {
     const allCars        = classGroups.flatMap(g => g.cars);
     const totalPositions = allCars.length;
     const selectedCarIds = new Set(data.map(r => r.entryCarId).filter(Boolean));
@@ -1076,7 +1078,14 @@ function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc }: Ra
             <div className="flex items-center justify-between border-b border-border px-4 py-2">
                 <span className="font-semibold">{title}</span>
                 {onImportAcc && (
-                    <Button type="button" variant="outline" size="sm" onClick={onImportAcc}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onImportAcc}
+                        disabled={!importAccEnabled}
+                        title={!importAccEnabled ? 'No ACC data available for this stage' : undefined}
+                    >
                         Import from ACC
                     </Button>
                 )}

@@ -65,6 +65,7 @@ interface ResultsGridSession {
     session_id: number;
     is_sprint: boolean;
     session_order: number;
+    name: string | null;
 }
 
 interface ResultsGridRound {
@@ -360,7 +361,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                                     <td key={`${origIdx}-${session.session_id}`} className={`border-r px-1 py-1 text-center leading-tight ${posCls}`} style={{ minWidth: 36 }}>
                                                                                         <span className={`block text-[10px] ${labelActive}`}>{round.race_code}</span>
                                                                                         {round.sessions.length > 1 && (
-                                                                                            <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : `R${session.session_order}`}</span>
+                                                                                            <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : (session.name ?? `${session.session_order}`)}</span>
                                                                                         )}
                                                                                         <span className="block">{result ?? ''}</span>
                                                                                     </td>
@@ -497,7 +498,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                                                 <td key={`${origIdx}-${session.session_id}`} className={`border-r px-1 py-1 text-center leading-tight ${posCls}`} style={{ minWidth: 36 }}>
                                                                                                     <span className={`block text-[10px] ${labelActive}`}>{round.race_code}</span>
                                                                                                     {round.sessions.length > 1 && (
-                                                                                                        <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : `R${session.session_order}`}</span>
+                                                                                                        <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : (session.name ?? `${session.session_order}`)}</span>
                                                                                                     )}
                                                                                                     <div class="flex w-full text-center justify-center">                                                                                                    
                                                                                                         <span className="block">{overallResult ?? ''}</span>
