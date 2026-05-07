@@ -20,6 +20,7 @@ interface Driver {
 interface EntryCar {
     id: number;
     car_number: string;
+    effective_from_round: number;
 }
 
 interface EntryClass {
@@ -70,10 +71,14 @@ export default function EntryCarDriversEdit({
         entryCar: entryCar.id,
     };
 
+    const carLabel = entryCar.effective_from_round > 1
+        ? `Car #${entryCar.car_number} (from R${entryCar.effective_from_round})`
+        : `Car #${entryCar.car_number}`;
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: world.name, href: '#' },
         { title: season.name, href: '#' },
-        { title: `Car #${entryCar.car_number}`, href: '#' },
+        { title: carLabel, href: '#' },
         { title: 'Drivers', href: '#' },
     ];
 
@@ -134,11 +139,11 @@ export default function EntryCarDriversEdit({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Car #${entryCar.car_number} — Drivers`} />
+            <Head title={`${carLabel} — Drivers`} />
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-sm text-muted-foreground">{season.name} — Car #{entryCar.car_number}</p>
+                        <p className="text-sm text-muted-foreground">{season.name} — {carLabel}</p>
                         <h1 className="text-2xl font-semibold">Assign Drivers</h1>
                     </div>
                 </div>

@@ -24,6 +24,7 @@ class RaceWeekendController extends Controller
     public function showManage(CalendarRace $race, Request $request)
     {
         $race->load([
+            'season.series',
             'season.seasonEntries.entryClasses.raceClass',
             'season.seasonEntries.entryClasses.entryCars.entryClass.raceClass',
             'season.seasonEntries.entryClasses.entryCars.entryClass.seasonEntry.entrant',
@@ -36,6 +37,18 @@ class RaceWeekendController extends Controller
             'raceSessions.results',
             'qualifyingSessions.results',
         ]);
+
+        // Filter each entry class's cars so only the active car per car_number at this round is shown
+        foreach ($race->season->seasonEntries as $seasonEntry) {
+            foreach ($seasonEntry->entryClasses as $entryClass) {
+                $filtered = $entryClass->entryCars
+                    ->where('effective_from_round', '<=', $race->round_number)
+                    ->groupBy('car_number')
+                    ->map(fn ($group) => $group->sortByDesc('effective_from_round')->first())
+                    ->values();
+                $entryClass->setRelation('entryCars', $filtered);
+            }
+        }
 
         $hasSprint      = request('has_sprint');
         $numberOfRaces  = $race->number_of_races ?? 1;
@@ -135,7 +148,7 @@ class RaceWeekendController extends Controller
             }
         }
 
-        $accSessionData = $this->parseAccSessionData($race->id, $hasStages ? count($stageNames) : $numberOfRaces, $hasStages ? $stageNames : null);
+        $accSessionData = $this->parseAccSessionData($race, $hasStages ? count($stageNames) : $numberOfRaces, $hasStages ? $stageNames : null);
 
         return Inertia::render('races/weekend/manage', [
             'race'                 => $race,
@@ -345,10 +358,10 @@ class RaceWeekendController extends Controller
      *     'race'       => [ 1 => [...lines], ... ],  // keyed by race/stage number
      *   ]
      */
-    protected function parseAccSessionData(int $raceId, int $numberOfRaces, ?array $stageNames = null): array
+    protected function parseAccSessionData(CalendarRace $race, int $numberOfRaces, ?array $stageNames = null): array
     {
         $accSessionData = ['qualifying' => [], 'race' => []];
-        $accDir = public_path("acc_races/{$raceId}");
+        $accDir = $race->accFolder();
 
         if (!is_dir($accDir)) {
             return $accSessionData;
@@ -428,7 +441,7 @@ class RaceWeekendController extends Controller
      * the number of intermediate stages (excluding the final Race result).
      * The final snapshot is handled separately and stored in accSessionData['race'].
      *
-     * @param  string  $accDir     Path to acc_races/{raceId}
+     * @param  string  $accDir     Path to acc_races/{id} - {shortName} {raceCode}
      * @param  array   $stageNames Intermediate stage objects, e.g. [['name'=>'6hrs','point_system_id'=>1],...]
      * @return array<int, array>   Keyed 1…N, same shape as accSessionData['race']
      */

@@ -149,9 +149,9 @@ class SeasonController extends Controller
             }
 
             // Save Calendar (WITH race override point system)
+            $createdCalendarRaces = [];
             foreach ($request->circuits as $index => $race) {
-
-                CalendarRace::create([
+                $createdCalendarRaces[] = CalendarRace::create([
                     'season_id' => $season->id,
                     'track_layout_id' => $race['layout_id'],
                     'round_number' => $index + 1,
@@ -167,6 +167,18 @@ class SeasonController extends Controller
             }
 
             DB::commit();
+
+            // Auto-create ACC race folders for all new unlocked races
+            $series = Series::find($request->series_id);
+            if ($series?->game === 'acc') {
+                $shortName = $series->short_name ?? '';
+                foreach ($createdCalendarRaces as $calRace) {
+                    $folder = CalendarRace::buildAccFolderPath($calRace->id, $shortName, $calRace->race_code);
+                    if (!is_dir($folder)) {
+                        mkdir($folder, 0755, true);
+                    }
+                }
+            }
 
             return redirect()
                 ->route('dashboard')
@@ -397,7 +409,8 @@ class SeasonController extends Controller
                 ->delete();
 
             // Update calendar in-place to preserve IDs (important for file references)
-            $submittedIds = [];
+            $submittedIds      = [];
+            $unlockedCalRaces  = []; // track unlocked races for folder creation
 
             foreach ($request->circuits as $index => $race) {
                 $attrs = [
@@ -422,13 +435,15 @@ class SeasonController extends Controller
                         // Skip finished races — preserve their data unchanged
                         if (!$calRace->is_locked && !$calRace->results()->exists()) {
                             $calRace->update($attrs);
+                            $unlockedCalRaces[] = $calRace;
                         }
                         continue;
                     }
                 }
 
                 $created = CalendarRace::create($attrs);
-                $submittedIds[] = $created->id;
+                $submittedIds[]     = $created->id;
+                $unlockedCalRaces[] = $created;
             }
 
             // Remove calendar races that were deleted in the editor (never delete finished races)
@@ -439,6 +454,18 @@ class SeasonController extends Controller
                 ->delete();
 
             DB::commit();
+
+            // Auto-create ACC race folders for all unlocked races
+            $series = Series::find($request->series_id);
+            if ($series?->game === 'acc') {
+                $shortName = $series->short_name ?? '';
+                foreach ($unlockedCalRaces as $calRace) {
+                    $folder = CalendarRace::buildAccFolderPath($calRace->id, $shortName, $calRace->race_code);
+                    if (!is_dir($folder)) {
+                        mkdir($folder, 0755, true);
+                    }
+                }
+            }
 
             return redirect()
                 ->route('seasons.show', [$season])
@@ -468,7 +495,7 @@ class SeasonController extends Controller
             return ['race' => null, 'teams' => []];
         }
 
-        $folder = public_path("acc_races/{$race->id}");
+        $folder = CalendarRace::buildAccFolderPath($race->id, $season->series->short_name, $race->race_code);
 
         if (!is_dir($folder)) {
             return ['race' => null, 'teams' => []];
@@ -716,7 +743,7 @@ class SeasonController extends Controller
             return back()->withErrors(['acc' => 'No unlocked race found.']);
         }
 
-        $folder = public_path("acc_races/{$race->id}");
+        $folder = CalendarRace::buildAccFolderPath($race->id, $season->series->short_name, $race->race_code);
 
         // Aggregate all qualifying sessions into a map: carNumber → [cup_category, drivers]
         // Reading multiple files handles endurance weekends with N qualifying sessions.
@@ -787,9 +814,12 @@ class SeasonController extends Controller
         foreach ($carDataMap as $carNo => $carData) {
             $cupCategory = $carData['cup_category'];
 
+            // Pick the active car for this round: highest effective_from_round <= current round_number.
             $entryCar = \App\Models\EntryCar::with(['entryClass.raceClass'])
                 ->where('car_number', $carNo)
+                ->where('effective_from_round', '<=', $race->round_number)
                 ->whereHas('entryClass.seasonEntry', fn($q) => $q->where('season_id', $season->id))
+                ->orderByDesc('effective_from_round')
                 ->first();
 
             if (!$entryCar) {
@@ -813,8 +843,9 @@ class SeasonController extends Controller
 
                         $entryCar = \App\Models\EntryCar::firstOrCreate(
                             [
-                                'entry_class_id' => $newEntryClass->id,
-                                'car_number'     => $entryCar->car_number,
+                                'entry_class_id'       => $newEntryClass->id,
+                                'car_number'           => $entryCar->car_number,
+                                'effective_from_round' => $entryCar->effective_from_round,
                             ],
                             [
                                 'car_model_id' => $entryCar->car_model_id,

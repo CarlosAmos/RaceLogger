@@ -25,6 +25,7 @@ interface EntryCar {
     entry_class: EntryClassRelation | null;
     car_model: CarModel | null;
     drivers: Driver[];
+    effective_from_round: number;
 }
 interface EntryClassWithCars {
     id: number;
@@ -209,6 +210,7 @@ function carLabel(car: EntryCar): string {
     const drivers = car.drivers.map(d => `${d.first_name} ${d.last_name}`).join(', ');
     let label = `#${car.car_number} ${name}`;
     if (model) label += ` (${model})`;
+    if (car.effective_from_round > 1) label += ` [from R${car.effective_from_round}]`;
     if (drivers) label += ` - ${drivers}`;
     return label;
 }
@@ -528,10 +530,15 @@ export default function ManageWeekend({
     }
 
     function toggleSelectAll(group: ClassGroup) {
-        const allSelected = group.cars.every(c => selectedCarIds.has(c.id));
+        const carsWithDrivers = group.cars.filter(c => c.drivers.length > 0);
+        const allSelected = carsWithDrivers.length > 0 && carsWithDrivers.every(c => selectedCarIds.has(c.id));
         setSelectedCarIds(prev => {
             const next = new Set(prev);
-            group.cars.forEach(c => allSelected ? next.delete(c.id) : next.add(c.id));
+            if (allSelected) {
+                group.cars.forEach(c => next.delete(c.id));
+            } else {
+                carsWithDrivers.forEach(c => next.add(c.id));
+            }
             return next;
         });
     }
@@ -794,27 +801,31 @@ export default function ManageWeekend({
                                             size="sm"
                                             onClick={() => toggleSelectAll(group)}
                                         >
-                                            {group.cars.every(c => selectedCarIds.has(c.id)) ? 'Deselect All' : 'Select All'}
+                                            {group.cars.filter(c => c.drivers.length > 0).every(c => selectedCarIds.has(c.id)) && group.cars.some(c => c.drivers.length > 0) ? 'Deselect All' : 'Select All'}
                                         </Button>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
                                     {group.cars.map(car => {
                                         const checked = selectedCarIds.has(car.id);
+                                        const hasDrivers = car.drivers.length > 0;
                                         const name = car.livery_name ?? car.entry_class?.season_entry?.entrant?.name ?? '';
                                         return (
                                             <label
                                                 key={car.id}
-                                                className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 transition-colors ${
-                                                    checked
-                                                        ? 'border-primary bg-primary/10'
-                                                        : 'border-border bg-background hover:bg-accent'
+                                                className={`flex items-center gap-2 rounded-lg border p-2.5 transition-colors ${
+                                                    !hasDrivers
+                                                        ? 'cursor-not-allowed border-border bg-background opacity-40'
+                                                        : checked
+                                                            ? 'cursor-pointer border-primary bg-primary/10'
+                                                            : 'cursor-pointer border-border bg-background hover:bg-accent'
                                                 }`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={checked}
-                                                    onChange={() => toggleCar(car.id)}
+                                                    disabled={!hasDrivers}
+                                                    onChange={() => hasDrivers && toggleCar(car.id)}
                                                     className="rounded"
                                                 />
                                                 <span className="text-sm">

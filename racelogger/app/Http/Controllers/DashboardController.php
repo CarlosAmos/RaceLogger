@@ -80,6 +80,7 @@ class DashboardController extends Controller
     {
         $race = CalendarRace::where('is_locked', 0)
             ->whereHas('season.series', fn($q) => $q->where('world_id', $worldId)->where('game', 'acc'))
+            ->with('season.series')
             ->orderBy('id', 'asc')
             ->first();
 
@@ -87,7 +88,7 @@ class DashboardController extends Controller
             return ['race' => null, 'unmatched' => []];
         }
 
-        $folder = public_path("acc_races/{$race->id}");
+        $folder = \App\Models\CalendarRace::buildAccFolderPath($race->id, $race->season->series->short_name, $race->race_code);
 
         if (!is_dir($folder)) {
             return ['race' => null, 'unmatched' => []];

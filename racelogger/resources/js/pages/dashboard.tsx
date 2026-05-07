@@ -51,6 +51,11 @@ interface SubClassRow {
     position: number | null;
 }
 
+interface TeamRow {
+    team: string;
+    stats: SeasonStats;
+}
+
 interface CareerEntry {
     season_id: number;
     series_name: string;
@@ -59,6 +64,7 @@ interface CareerEntry {
     position: number;
     stats: SeasonStats;
     sub_class_rows: SubClassRow[];
+    team_rows?: TeamRow[];
 }
 
 interface ResultsGridSession {
@@ -232,22 +238,35 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                             {Object.entries(careerMap).map(([year, yearSeasons]) => {
                                                 type FlatRow =
                                                     | { kind: 'main'; seasonId: string; entry: CareerEntry }
+                                                    | { kind: 'team'; seasonId: string; entry: CareerEntry; team: TeamRow; isFirst: boolean; teamCount: number }
                                                     | { kind: 'sub'; seasonId: string; entry: CareerEntry; sub: SubClassRow };
 
                                                 const flatRows: FlatRow[] = [];
                                                 Object.entries(yearSeasons).forEach(([seasonId, entry]) => {
-                                                    flatRows.push({ kind: 'main', seasonId, entry });
+                                                    if (entry.team_rows && entry.team_rows.length > 1) {
+                                                        const teamCount = entry.team_rows.length;
+                                                        entry.team_rows.forEach((team, teamIdx) =>
+                                                            flatRows.push({ kind: 'team', seasonId, entry, team, isFirst: teamIdx === 0, teamCount })
+                                                        );
+                                                    } else {
+                                                        flatRows.push({ kind: 'main', seasonId, entry });
+                                                    }
                                                     (entry.sub_class_rows ?? []).forEach(sub =>
                                                         flatRows.push({ kind: 'sub', seasonId, entry, sub })
                                                     );
                                                 });
 
                                                 return flatRows.map((row, idx) => {
-                                                    const stats   = row.kind === 'sub' ? row.sub.stats   : row.entry.stats;
+                                                    const stats   = row.kind === 'sub' ? row.sub.stats : row.kind === 'team' ? row.team.stats : row.entry.stats;
                                                     const ordinal = row.kind === 'sub' ? row.sub.ordinal : row.entry.ordinal;
                                                     const key     = row.kind === 'sub'
                                                         ? `${year}-${row.seasonId}-sub-${row.sub.class_id}`
+                                                        : row.kind === 'team'
+                                                        ? `${year}-${row.seasonId}-team-${row.team.team}`
                                                         : `${year}-${row.seasonId}`;
+
+                                                    const showPositionCell = row.kind !== 'team' || row.isFirst;
+                                                    const positionRowSpan = row.kind === 'team' && row.isFirst ? row.teamCount : undefined;
 
                                                     return (
                                                         <tr key={key} className={`border-b hover:bg-muted/30 ${row.kind === 'sub' ? 'bg-muted/5' : ''}`}>
@@ -256,7 +275,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                     {year}
                                                                 </td>
                                                             )}
-                                                            <td className="border-r px-3 py-2 font-semibold">
+                                                            <td className="border-r px-3 py-2 font-semibold align-middle">
                                                                 {row.kind === 'sub' ? (
                                                                     <span className="pl-4 text-xs text-muted-foreground">{row.sub.label}</span>
                                                                 ) : (
@@ -266,7 +285,11 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                 )}
                                                             </td>
                                                             <td className="border-r px-3 py-2 italic text-muted-foreground">
-                                                                {row.kind === 'main' && (Array.isArray(row.entry.teams) ? row.entry.teams.join(', ') : '')}
+                                                                {row.kind === 'team'
+                                                                    ? row.team.team
+                                                                    : row.kind === 'main'
+                                                                    ? (Array.isArray(row.entry.teams) ? row.entry.teams.join(', ') : '')
+                                                                    : ''}
                                                             </td>
                                                             <td className="border-r px-3 py-2 text-center">{stats.races}</td>
                                                             <td className="border-r px-3 py-2 text-center">{stats.wins}</td>
@@ -274,9 +297,11 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                             <td className="border-r px-3 py-2 text-center">{stats.fastest_laps}</td>
                                                             <td className="border-r px-3 py-2 text-center">{stats.podiums}</td>
                                                             <td className="border-r px-3 py-2 text-center font-bold">{stats.points}</td>
-                                                            <td className={`px-3 py-2 text-center font-black ${champPositionClass(ordinal)}`}>
-                                                                {ordinal}{row.kind === 'main' && row.entry.stats.season_active === 1 ? ' *' : ''}
-                                                            </td>
+                                                            {showPositionCell && (
+                                                                <td rowSpan={positionRowSpan} className={`px-3 py-2 text-center font-black align-middle ${champPositionClass(ordinal)}`}>
+                                                                    {ordinal}{(row.kind === 'main' || (row.kind === 'team' && row.isFirst)) && row.entry.stats.season_active === 1 ? ' *' : ''}
+                                                                </td>
+                                                            )}
                                                         </tr>
                                                     );
                                                 });
@@ -336,9 +361,12 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                             const champPos = careerEntry?.ordinal ?? '-';
                                                             const points = careerEntry?.stats?.points ?? '-';
 
+                                                            const entryCount = seasonData.entries.length;
                                                             return seasonData.entries.map((entry, entryIdx) => (
                                                                 <tr key={`${year}-${entryIdx}`} className="border-b hover:bg-muted/30">
-                                                                    <td className="border-r bg-muted/20 px-3 py-2 text-center font-extrabold align-middle">{year}</td>
+                                                                    {entryIdx === 0 && (
+                                                                        <td className="border-r bg-muted/20 px-3 py-2 text-center font-extrabold align-middle" rowSpan={entryCount > 1 ? entryCount : undefined}>{year}</td>
+                                                                    )}
                                                                     {seriesData.is_spec ? (
                                                                         <td className="border-r px-3 py-2 italic text-muted-foreground">{entry.entrant}</td>
                                                                     ) : (
@@ -378,8 +406,12 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                     {Array.from({ length: paddingCols }, (_, i) => (
                                                                         <td key={`pad-${i}`} className="border-r px-1 py-1" />
                                                                     ))}
-                                                                    <td className={`border-r px-2 py-2 text-center font-black ${champPositionClass(champPos)}`}>{champPos}</td>
-                                                                    <td className="px-2 py-2 text-center font-bold">{points}</td>
+                                                                    {entryIdx === 0 && (
+                                                                        <>
+                                                                            <td className={`border-r px-2 py-2 text-center font-black ${champPositionClass(champPos)}`} rowSpan={entryCount > 1 ? entryCount : undefined}>{champPos}</td>
+                                                                            <td className="px-2 py-2 text-center font-bold" rowSpan={entryCount > 1 ? entryCount : undefined}>{points}</td>
+                                                                        </>
+                                                                    )}
                                                                 </tr>
                                                             ));
                                                         })}
@@ -413,10 +445,15 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
-                                                                        {events.map(({ year, roundIdx, entries }) =>
-                                                                            entries.map((entry, entryIdx) => {
+                                                                        {events.map(({ year, roundIdx, entries }) => {
+                                                                            const entriesWithResult = entries.filter(e =>
+                                                                                Object.values(e.results?.[roundIdx] ?? {}).some(r => r !== null)
+                                                                            );
+                                                                            const visibleEntries = entriesWithResult.length > 0 ? entriesWithResult : [entries[entries.length - 1]];
+                                                                            return visibleEntries.map((entry, entryIdx) => {
                                                                                 const round = seriesData.seasons[Number(year)].calendar[roundIdx];
-                                                                                const mainSession = round.sessions.find((s: ResultsGridSession) => !s.is_sprint) ?? round.sessions[0] ?? null;
+                                                                                const nonSprintSessions = round.sessions.filter((s: ResultsGridSession) => !s.is_sprint);
+                                                const mainSession = nonSprintSessions.sort((a, b) => b.session_order - a.session_order)[0] ?? round.sessions[0] ?? null;
                                                                                 const overallResult = mainSession ? entry.results?.[roundIdx]?.[mainSession.session_id] ?? null : null;
                                                                                 const subResult = (hasSubClass && mainSession && entry.subclass_results)
                                                                                     ? entry.subclass_results?.[roundIdx]?.[mainSession.session_id] ?? null
@@ -434,8 +471,8 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                                         <td className={`px-2 py-2 text-center font-bold ${positionClass(overallResult)}`}>{overallResult ?? '-'}</td>
                                                                                     </tr>
                                                                                 );
-                                                                            })
-                                                                        )}
+                                                                            });
+                                                                        })}
                                                                     </tbody>
                                                                 </table>
                                                             </div>
@@ -500,7 +537,7 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                                                                     {round.sessions.length > 1 && (
                                                                                                         <span className={`block text-[10px] italic ${labelActive}`}>{session.is_sprint ? 'SPR' : (session.name ?? `${session.session_order}`)}</span>
                                                                                                     )}
-                                                                                                    <div class="flex w-full text-center justify-center">                                                                                                    
+                                                                                                    <div className="flex w-full text-center justify-center">
                                                                                                         <span className="block">{overallResult ?? ''}</span>
                                                                                                         {subResult !== null && subResult !== overallResult && (
                                                                                                             <span className="block text-[9px] opacity-70">({subResult})</span>

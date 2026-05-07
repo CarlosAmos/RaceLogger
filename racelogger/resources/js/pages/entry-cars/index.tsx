@@ -20,6 +20,7 @@ interface EntryCar {
     livery_name: string | null;
     chassis_code: string | null;
     car_model: CarModel | null;
+    effective_from_round: number;
 }
 
 interface EntryClass {
@@ -100,7 +101,14 @@ export default function EntryCarsIndex({ world, season, seasonEntry, entryClass,
                             <tbody>
                                 {entryCars.map((car) => (
                                     <tr key={car.id} className="border-b border-sidebar-border last:border-0">
-                                        <td className="px-4 py-3 font-medium">{car.car_number}</td>
+                                        <td className="px-4 py-3 font-medium">
+                                            {car.car_number}
+                                            {car.effective_from_round > 1 && (
+                                                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                                                    from R{car.effective_from_round}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-muted-foreground">{car.car_model?.name ?? '—'}</td>
                                         <td className="px-4 py-3 text-muted-foreground">{car.livery_name ?? '—'}</td>
                                         <td className="px-4 py-3 text-muted-foreground">{car.chassis_code ?? '—'}</td>

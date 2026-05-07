@@ -13,6 +13,7 @@ class EntryCar extends Model
         'car_number',
         'livery_name',
         'chassis_code',
+        'effective_from_round',
     ];
 
     public function entryClass()

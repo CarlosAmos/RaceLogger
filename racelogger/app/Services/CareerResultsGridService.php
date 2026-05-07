@@ -66,7 +66,7 @@ class CareerResultsGridService
                 'r.status',
                 'r.points_awarded',
                 'ec.id as entry_car_id',
-                'e.name as entrant_name',
+                \DB::raw('COALESCE(se.display_name, e.name) as entrant_name'),
                 'cm.name as car_model_name',
                 'eng.name as engine_name',
                 'eng.capacity as engine_capacity',

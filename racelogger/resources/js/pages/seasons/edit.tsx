@@ -194,6 +194,8 @@ export default function SeasonEdit({
     const [activeTab, setActiveTab] = useState<Tab>((initialTab as Tab) ?? 'circuits');
     const [teamSearch, setTeamSearch] = useState('');
     const [teamSort, setTeamSort] = useState<'latest' | 'az' | 'za'>('latest');
+    const [editingEntryId, setEditingEntryId] = useState<number | null>(null);
+    const [editDisplayName, setEditDisplayName] = useState('');
     const [circuits, setCircuits] = useState<CircuitRow[]>(() => circuitsFromCalendar(calendarRaces));
     const [classes, setClasses] = useState<ClassGroup[]>(() => {
         const groups: Record<string, string[]> = {};
@@ -674,13 +676,65 @@ export default function SeasonEdit({
                                         <div key={entry.id} className="rounded-xl border border-border bg-card p-4">
                                             <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold">
-                                                        {entry.display_name ?? entry.entrant?.name}
-                                                    </span>
-                                                    {entry.display_name && (
-                                                        <span className="text-xs italic text-muted-foreground">
-                                                            {entry.entrant?.name}
-                                                        </span>
+                                                    {editingEntryId === entry.id ? (
+                                                        <>
+                                                            <Input
+                                                                value={editDisplayName}
+                                                                onChange={(e) => setEditDisplayName(e.target.value)}
+                                                                placeholder={entry.entrant?.name ?? ''}
+                                                                className="h-7 w-48 text-sm"
+                                                                autoFocus
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        router.put(
+                                                                            `/worlds/${worlds.id}/seasons/${season.id}/season-entries/${entry.id}`,
+                                                                            { display_name: editDisplayName || null },
+                                                                            { preserveScroll: true, onSuccess: () => setEditingEntryId(null) }
+                                                                        );
+                                                                    }
+                                                                    if (e.key === 'Escape') setEditingEntryId(null);
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="text-xs text-primary hover:underline"
+                                                                onClick={() => {
+                                                                    router.put(
+                                                                        `/worlds/${worlds.id}/seasons/${season.id}/season-entries/${entry.id}`,
+                                                                        { display_name: editDisplayName || null },
+                                                                        { preserveScroll: true, onSuccess: () => setEditingEntryId(null) }
+                                                                    );
+                                                                }}
+                                                            >Save</button>
+                                                            <button
+                                                                type="button"
+                                                                className="text-xs text-muted-foreground hover:underline"
+                                                                onClick={() => setEditingEntryId(null)}
+                                                            >Cancel</button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="font-semibold">
+                                                                {entry.display_name ?? entry.entrant?.name}
+                                                            </span>
+                                                            {entry.display_name && (
+                                                                <span className="text-xs italic text-muted-foreground">
+                                                                    {entry.entrant?.name}
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                title="Edit display name"
+                                                                className="text-muted-foreground hover:text-foreground"
+                                                                onClick={() => {
+                                                                    setEditingEntryId(entry.id);
+                                                                    setEditDisplayName(entry.display_name ?? '');
+                                                                }}
+                                                            >
+                                                                <Pencil className="h-3 w-3" />
+                                                            </button>
+                                                        </>
                                                     )}
                                                     <Link
                                                         href={entryCars.create_entry({ world: worlds.id, season: season.id, seasonEntry: entry.id }).url}

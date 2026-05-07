@@ -75,12 +75,16 @@ class EntryCarController extends Controller
                 'required',
                 'string',
                 Rule::unique('entry_cars')
-                    ->where('entry_class_id', $entryClass->id),
+                    ->where('entry_class_id', $entryClass->id)
+                    ->where('effective_from_round', $request->input('effective_from_round', 1)),
             ],
             'car_model_id' => 'required|exists:car_models,id',
             'livery_name' => 'nullable|string|max:255',
             'chassis_code' => 'nullable|string|max:255',
+            'effective_from_round' => 'integer|min:1',
         ]);
+
+        $validated['effective_from_round'] = $validated['effective_from_round'] ?? 1;
 
         $entryClass->entryCars()->create($validated);
         return redirect()
@@ -169,24 +173,30 @@ class EntryCarController extends Controller
 
             $id = $entryClass->id;
 
-            $validated = $request->validate([                
+            $effectiveFromRound = (int) $request->input('effective_from_round', 1);
+
+            $validated = $request->validate([
                 'car_number' => [
                     'required',
                     'string',
                     Rule::unique('entry_cars')
-                        ->where('entry_class_id', $id),
+                        ->where('entry_class_id', $id)
+                        ->where('effective_from_round', $effectiveFromRound),
                 ],
                 'car_model_id' => 'required|exists:car_models,id',
                 'livery_name' => 'nullable|string|max:255',
                 'chassis_code' => 'nullable|string|max:255',
+                'effective_from_round' => 'integer|min:1',
             ]);
 
             EntryCar::firstOrCreate([
                 'entry_class_id' => $id,
                 'car_number' => $validated['car_number'],
+                'effective_from_round' => $effectiveFromRound,
+            ], [
                 'car_model_id' => $validated['car_model_id'],
                 'livery_name' => $validated['livery_name'],
-                'chassis_code' => $validated['livery_name'],
+                'chassis_code' => $validated['chassis_code'],
             ]);
 
             return redirect()

@@ -87,11 +87,22 @@ class SeasonEntryController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the display name for a season entry.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, World $world, Season $season, SeasonEntry $seasonEntry)
     {
-        //
+        $validated = $request->validate([
+            'display_name' => 'nullable|string|max:255',
+        ]);
+
+        $seasonEntry->update([
+            'display_name' => $validated['display_name'] ?: null,
+        ]);
+
+        return redirect()
+            ->route('worlds.seasons.edit', [$world, $season])
+            ->with('success', 'Display name updated.')
+            ->setStatusCode(303);
     }
 
     /**

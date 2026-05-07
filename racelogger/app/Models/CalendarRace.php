@@ -120,5 +120,22 @@ class CalendarRace extends Model
     {
         return $this->belongsTo(\App\Models\TrackLayout::class, 'track_layout_id');
     }
-    
+
+    /**
+     * Return the ACC results folder path for this race.
+     * Lazily loads season.series if not already loaded.
+     */
+    public function accFolder(): string
+    {
+        $shortName = $this->season->series->short_name ?? '';
+        return public_path("acc_races/{$this->id} - {$shortName} {$this->race_code}");
+    }
+
+    /**
+     * Build the ACC folder path from explicit components (avoids relationship loads).
+     */
+    public static function buildAccFolderPath(int $id, ?string $seriesShortName, string $raceCode): string
+    {
+        return public_path("acc_races/{$id} - {$seriesShortName} {$raceCode}");
+    }
 }

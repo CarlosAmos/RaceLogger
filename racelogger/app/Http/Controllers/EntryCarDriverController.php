@@ -31,7 +31,9 @@ class EntryCarDriverController extends Controller
             ->pluck('drivers.id')
             ->toArray();
         $drivers->sortBy('first_name');
-        // Drivers assigned anywhere else in this season
+        // Drivers assigned to a DIFFERENT seat this season.
+        // Exclude all entry_cars sharing the same car_number + entry_class (different effective_from_round
+        // records are the same physical seat, just a mid-season car change).
         $otherCarDriverIds = $season->seasonEntries()
             ->with('entryClasses.entryCars.drivers')
             ->get()
@@ -39,7 +41,13 @@ class EntryCarDriverController extends Controller
             ->flatten()
             ->pluck('entryCars')
             ->flatten()
-            ->where('id', '!=', $entryCar->id)
+            ->filter(fn ($car) =>
+                $car->id !== $entryCar->id &&
+                !(
+                    $car->entry_class_id === $entryCar->entry_class_id &&
+                    $car->car_number     === $entryCar->car_number
+                )
+            )
             ->pluck('drivers')
             ->flatten()
             ->pluck('id')

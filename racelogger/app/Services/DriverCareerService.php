@@ -44,6 +44,24 @@ class DriverCareerService
                         $overallSprintStandings,
                     );
 
+                    $uniqueEntrants = $seasonGroup->unique('entrant_id')
+                        ->filter(fn($r) => $r->entrant_id !== null);
+
+                    $teamRows = [];
+                    if ($uniqueEntrants->count() > 1) {
+                        foreach ($uniqueEntrants as $entrantRow) {
+                            $teamStats = $this->aggregateStatsForSeasonEntrant(
+                                $driverId,
+                                $first->season_id,
+                                $entrantRow->entrant_id
+                            );
+                            $teamRows[] = [
+                                'team'  => $entrantRow->entrant_name,
+                                'stats' => $teamStats,
+                            ];
+                        }
+                    }
+
                     return [
                         'season_id'      => $first->season_id,
                         'series_name'    => $first->series_name,
@@ -52,6 +70,7 @@ class DriverCareerService
                         'ordinal'        => $position ? $this->getOrdinalSuffix($position) : '-',
                         'position'       => $position,
                         'sub_class_rows' => $subClassRows,
+                        'team_rows'      => $teamRows,
                     ];
                 });
             });
@@ -70,7 +89,7 @@ class DriverCareerService
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('ecd.driver_id', $driverId)
             ->where('ser.world_id', $worldId)
-            ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.name as entrant_name', 'sc.name as class_name']);
+            ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.id as entrant_id', DB::raw('COALESCE(se.display_name, e.name) as entrant_name'), 'sc.name as class_name']);
 
         // Results drivers (for one-offs/mid-season)
         $results = DB::table('result_drivers as rd')
@@ -84,7 +103,7 @@ class DriverCareerService
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('rd.driver_id', $driverId)
             ->where('ser.world_id', $worldId)
-            ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.name as entrant_name', 'sc.name as class_name']);
+            ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.id as entrant_id', DB::raw('COALESCE(se.display_name, e.name) as entrant_name'), 'sc.name as class_name']);
 
         return $assigned->union($results)->get();
     }
@@ -165,6 +184,73 @@ class DriverCareerService
     }
 
     /**
+     * Aggregate race stats for a driver with a specific entrant in a season.
+     * Used to compute per-team stats when a driver drove for multiple teams in one season.
+     */
+    public function aggregateStatsForSeasonEntrant(int $driverId, int $seasonId, int $entrantId): object
+    {
+        $sql = <<<SQL
+            SELECT
+                SUM(season_car_stats.races) as races,
+                SUM(season_car_stats.wins) as wins,
+                SUM(season_car_stats.podiums) as podiums,
+                SUM(season_car_stats.fastest_laps) as fastest_laps,
+                SUM(season_car_stats.total_points) as total_points,
+                SUM(season_car_stats.poles) as poles,
+                MAX(season_car_stats.has_unlocked_races) as is_active_season
+            FROM (
+                SELECT
+                    COUNT(DISTINCT r.id) as races,
+                    COUNT(DISTINCT CASE WHEN r.class_position = 1 THEN r.id END) as wins,
+                    COUNT(DISTINCT CASE WHEN r.class_position <= 3 AND r.class_position > 0 THEN r.id END) as podiums,
+                    SUM(r.points_awarded) as total_points,
+                    CASE WHEN MIN(cr.is_locked) = 0 THEN 1 ELSE 0 END as has_unlocked_races,
+                    COUNT(DISTINCT CASE WHEN r.fastest_lap = 1 THEN r.id END) as fastest_laps,
+                    (SELECT COUNT(DISTINCT qr.id)
+                     FROM qualifying_results qr
+                     JOIN qualifying_sessions qs ON qr.qualifying_session_id = qs.id
+                     JOIN calendar_races cr2 ON qs.calendar_race_id = cr2.id
+                     WHERE cr2.season_id = cr.season_id
+                     AND qr.position = 1
+                     AND qr.entry_car_id = r.entry_car_id) as poles
+                FROM result_drivers rd
+                INNER JOIN results r ON rd.result_id = r.id
+                INNER JOIN race_sessions rs ON r.race_session_id = rs.id
+                INNER JOIN calendar_races cr ON rs.calendar_race_id = cr.id
+                INNER JOIN entry_cars ec ON r.entry_car_id = ec.id
+                INNER JOIN entry_classes ecl ON ec.entry_class_id = ecl.id
+                INNER JOIN season_entries se ON ecl.season_entry_id = se.id
+                WHERE rd.driver_id = ?
+                AND cr.season_id = ?
+                AND se.entrant_id = ?
+                AND rs.is_sprint = 0
+                GROUP BY cr.season_id, r.entry_car_id
+            ) as season_car_stats;
+        SQL;
+
+        $results = DB::selectOne($sql, [$driverId, $seasonId, $entrantId]);
+
+        if (!$results || !$results->races) {
+            return (object)[
+                'races' => 0, 'wins' => 0, 'podiums' => 0,
+                'poles' => 0, 'fastest_laps' => 0, 'points' => 0, 'season_active' => 0,
+            ];
+        }
+
+        return (object)[
+            'races'        => (int) $results->races,
+            'wins'         => (int) $results->wins,
+            'podiums'      => (int) $results->podiums,
+            'poles'        => (int) $results->poles,
+            'fastest_laps' => (int) $results->fastest_laps,
+            'points'       => (fmod($results->total_points, 1) == 0)
+                ? (int) $results->total_points
+                : (float) $results->total_points,
+            'season_active' => (int) $results->is_active_season,
+        ];
+    }
+
+    /**
      * Return per-sub-class career rows for seasons that have sub-classes (e.g. Silver/Gold).
      * When the season mixes endurance and sprint races, appends extra rows for each sub-class
      * filtered to endurance-only and sprint-only results.
@@ -203,11 +289,11 @@ class DriverCareerService
             ->get()
             ->reject(fn($sc) => strtolower($sc->sub_class) === 'pro');
 
-        if ($subClasses->isEmpty()) {
+        $hasEnduranceMix = $this->hasEnduranceMix($seasonId);
+
+        if ($subClasses->isEmpty() && !$hasEnduranceMix) {
             return [];
         }
-
-        $hasEnduranceMix = $this->hasEnduranceMix($seasonId);
 
         $rows = [];
 

@@ -67,6 +67,7 @@ export default function EntryCarCreate({ world, season, seasonEntry, entryClass,
         car_model_id: '',
         livery_name: '',
         chassis_code: '',
+        effective_from_round: 1,
     });
 
     function submit(e: React.FormEvent) {
@@ -135,6 +136,19 @@ export default function EntryCarCreate({ world, season, seasonEntry, entryClass,
                             placeholder="Optional"
                         />
                         <InputError message={errors.chassis_code} />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label htmlFor="effective_from_round">Active From Round</Label>
+                        <Input
+                            id="effective_from_round"
+                            type="number"
+                            min={1}
+                            value={data.effective_from_round}
+                            onChange={(e) => setData('effective_from_round', Number(e.target.value))}
+                        />
+                        <p className="text-xs text-muted-foreground">Set to 1 unless this is a mid-season car change</p>
+                        <InputError message={errors.effective_from_round} />
                     </div>
 
                     <Button type="submit" disabled={processing}>
