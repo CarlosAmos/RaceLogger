@@ -29,19 +29,18 @@ class PopulateLapRecords extends Command
             ->join('race_sessions as rs', 'results.race_session_id', '=', 'rs.id')
             ->join('calendar_races as cr', 'rs.calendar_race_id', '=', 'cr.id')
             ->join('seasons as s', 'cr.season_id', '=', 's.id')
-            ->join('series as ser', 's.series_id', '=', 'ser.id')
             ->orderBy('cr.race_date', 'asc')
             ->select('results.*');
 
         if ($worldId) {
-            $query->where('ser.world_id', $worldId);
+            $query->where('s.world_id', $worldId);
         }
 
         $updated = 0;
         $total   = 0;
 
         $query->with([
-            'raceSession.calendarRace.season.series',
+            'raceSession.calendarRace.season',
             'resultDrivers',
         ])->chunk(200, function ($results) use ($service, &$updated, &$total) {
             foreach ($results as $result) {

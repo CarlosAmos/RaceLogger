@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { Download } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import * as seasons from '@/routes/seasons';
@@ -112,6 +113,12 @@ interface ResultsGridSeries {
     sub_cups: ResultsGridSubCup[];
 }
 
+interface Driver {
+    id: number;
+    first_name: string;
+    last_name: string;
+}
+
 interface Props {
     world: World;
     currentYear: number;
@@ -119,6 +126,8 @@ interface Props {
     upcomingRaces: UpcomingRace[];
     careerMap: Record<number, Record<number, CareerEntry>>;
     resultsGrid: Record<string, ResultsGridSeries>;
+    driver: Driver;
+    myId: number;
 }
 
 const seriesColorClass: Record<string, string> = {
@@ -153,16 +162,34 @@ function champPositionClass(ordinal: string): string {
     return '';
 }
 
-export default function Dashboard({ world, currentYear, seasons: seasonsList, upcomingRaces, careerMap, resultsGrid }: Props) {
+export default function Dashboard({ world, currentYear, seasons: seasonsList, upcomingRaces, careerMap, resultsGrid, driver, myId }: Props) {
+    const isOwnDashboard = driver.id === myId;
+    const driverName = `${driver.first_name} ${driver.last_name}`;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
+            <Head title={isOwnDashboard ? 'Dashboard' : `${driverName} — Dashboard`} />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">{world.name} Dashboard</h1>
-                        <p className="text-sm text-muted-foreground">Current Year: <strong>{currentYear}</strong></p>
+                        <p className="text-sm text-muted-foreground">
+                            {isOwnDashboard ? (
+                                <>Current Year: <strong>{currentYear}</strong></>
+                            ) : (
+                                <>Viewing: <strong>{driverName}</strong> &mdash; <Link href="/dashboard" className="text-blue-600 hover:underline">Back to my dashboard</Link></>
+                            )}
+                        </p>
                     </div>
+                    {world.id === 1 && (
+                        <Link
+                            href="/import"
+                            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+                        >
+                            <Download className="h-4 w-4" />
+                            Import F1 Data
+                        </Link>
+                    )}
                 </div>
 
                 {seasonsList.length === 0 ? (

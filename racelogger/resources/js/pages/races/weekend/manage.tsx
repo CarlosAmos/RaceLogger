@@ -8,6 +8,8 @@ import type { BreadcrumbItem } from '@/types';
 import * as seasons from '@/routes/seasons';
 import * as racesWeekend from '@/routes/races/weekend';
 
+console.log('[manage.tsx] MODULE LOADED');
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Driver { id: number; first_name: string; last_name: string }
@@ -319,6 +321,7 @@ export default function ManageWeekend({
     stageNames,
     accSessionData,
 }: Props) {
+    console.log('[ManageWeekend] COMPONENT FUNCTION CALLED');
     const showSprint    = hasSprint === '1' || hasSprint === 1 as unknown;
     const numberOfRaces = race.number_of_races ?? 1;
     const multiRace     = numberOfRaces > 1;
@@ -333,6 +336,14 @@ export default function ManageWeekend({
     const [selectedCarIds, setSelectedCarIds] = useState<Set<number>>(
         () => new Set((race.entry_cars ?? []).map(c => c.id))
     );
+
+    useEffect(() => {
+        console.log('[ManageWeekend] Mount — defaultTab:', defaultTab);
+        console.log('[ManageWeekend] race.entry_cars count:', race.entry_cars?.length ?? 0);
+        console.log('[ManageWeekend] accSessionData:', accSessionData);
+        console.log('[ManageWeekend] qualifying keys:', Object.keys(accSessionData?.qualifying ?? {}));
+        console.log('[ManageWeekend] seasonCarGroups:', seasonCarGroups.map(g => ({ class: g.className, carCount: g.cars.length })));
+    }, []);
 
     // Per-race qualifying format (number of Q sessions)
     const [qualFormatByRace, setQualFormatByRace] = useState<Record<number, number>>(() => {
@@ -381,7 +392,11 @@ export default function ManageWeekend({
     const CUP_CATEGORY_LABEL: Record<number, string> = { 0: 'Pro', 1: 'Pro-Am', 2: 'Am', 3: 'Silver' };
 
     function autoAssignFromAcc() {
-        if (!accSessionData?.qualifying) return;
+        console.log('[AutoAssign] Function called');
+        if (!accSessionData?.qualifying) {
+            console.log('[AutoAssign] No qualifying data available');
+            return;
+        }
 
         // Collect unique raceNumber → cupCategory across all qualifying sessions
         const accCarMap = new Map<number, number | null>();
@@ -393,7 +408,13 @@ export default function ManageWeekend({
             }
         }
 
-        if (accCarMap.size === 0) return;
+        console.log('[AutoAssign] ACC car numbers:', [...accCarMap.keys()]);
+        console.log('[AutoAssign] Season car groups:', seasonCarGroups.map(g => ({ class: g.className, cars: g.cars.map(c => c.car_number) })));
+
+        if (accCarMap.size === 0) {
+            console.log('[AutoAssign] accCarMap is empty, aborting');
+            return;
+        }
 
         const matchedIds = new Set<number>();
 
@@ -426,6 +447,7 @@ export default function ManageWeekend({
             }
         }
 
+        console.log('[AutoAssign] Matched car IDs:', [...matchedIds]);
         setSelectedCarIds(new Set(matchedIds));
     }
 
@@ -433,6 +455,7 @@ export default function ManageWeekend({
         const raceNumber = raceNumberFromTab(activeTab);
 
         if (activeTab === 'participants') {
+            console.log('[Submit] participants selectedCarIds:', [...selectedCarIds]);
             form.transform(() => ({
                 submitted_tab: 'participants',
                 action,
@@ -1084,6 +1107,25 @@ function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc, impo
     const totalPositions = allCars.length;
     const selectedCarIds = new Set(data.map(r => r.entryCarId).filter(Boolean));
 
+    function handleLapsChange(idx: number, newLaps: string) {
+        if (idx === 0 || !newLaps) {
+            onUpdate(idx, { laps: newLaps });
+            return;
+        }
+        const firstLaps = data[0]?.laps;
+        if (!firstLaps) {
+            onUpdate(idx, { laps: newLaps });
+            return;
+        }
+        const firstNum   = parseInt(firstLaps, 10);
+        const currentNum = parseInt(newLaps, 10);
+        if (!isNaN(firstNum) && !isNaN(currentNum) && currentNum < firstNum) {
+            onUpdate(idx, { laps: newLaps, gap: `+${firstNum - currentNum}L` });
+        } else {
+            onUpdate(idx, { laps: newLaps });
+        }
+    }
+
     return (
         <div className="rounded-xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b border-border px-4 py-2">
@@ -1167,7 +1209,7 @@ function RaceResultsGrid({ title, classGroups, data, onUpdate, onImportAcc, impo
                                         <Input
                                             type="number"
                                             value={slot.laps}
-                                            onChange={e => onUpdate(idx, { laps: e.target.value })}
+                                            onChange={e => handleLapsChange(idx, e.target.value)}
                                             className="w-20"
                                             min={0}
                                         />

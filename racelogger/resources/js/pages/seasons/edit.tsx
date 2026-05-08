@@ -310,8 +310,12 @@ export default function SeasonEdit({
                         : [{ name: g.name, sub_class: null }]
                 ),
         }));
-        form.put(seasons.update(season.id).url);
+        form.put(`/seasons/${season.id}`);
     }
+
+    const sortedDrivers = [...drivers].sort((a, b) =>
+        `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+    );
 
     const selectedPs = pointSystems.find((ps) => String(ps.id) === form.data.point_system_id);
     const shortLayout = (name: string) => name.replace('Grand Prix', 'GP');
@@ -968,7 +972,7 @@ export default function SeasonEdit({
                                     className="rounded-md border border-border bg-background px-3 py-2 text-sm"
                                 >
                                     <option value="">— None —</option>
-                                    {drivers.map((d) => (
+                                    {sortedDrivers.map((d) => (
                                         <option key={d.id} value={String(d.id)}>
                                             {d.first_name} {d.last_name}
                                         </option>
@@ -985,7 +989,7 @@ export default function SeasonEdit({
                                     className="rounded-md border border-border bg-background px-3 py-2 text-sm"
                                 >
                                     <option value="">— None —</option>
-                                    {drivers.map((d) => (
+                                    {sortedDrivers.map((d) => (
                                         <option key={d.id} value={String(d.id)}>
                                             {d.first_name} {d.last_name}
                                         </option>

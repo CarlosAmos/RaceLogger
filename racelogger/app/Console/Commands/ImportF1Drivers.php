@@ -100,11 +100,10 @@ class ImportF1Drivers extends Command
             }
 
             Driver::create([
-                'world_id' => 1,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'country_id' => $country->id,
-                'date_of_birth' => $dob ?: null
+                'first_name'    => $firstName,
+                'last_name'     => $lastName,
+                'country_id'    => $country->id,
+                'date_of_birth' => $dob ?: null,
             ]);
 
             $this->info("Added driver: {$firstName} {$lastName}");

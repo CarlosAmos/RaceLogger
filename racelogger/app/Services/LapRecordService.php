@@ -21,15 +21,14 @@ class LapRecordService
         }
 
         $result->loadMissing([
-            'raceSession.calendarRace.season.series',
+            'raceSession.calendarRace.season',
             'resultDrivers',
         ]);
 
         $session = $result->raceSession;
         $calRace = $session->calendarRace;
-        $series  = $calRace->season->series;
 
-        $worldId       = $series->world_id;
+        $worldId       = $calRace->season->world_id;
         $trackLayoutId = $calRace->track_layout_id;
         $sessionType   = $session->is_sprint ? 'sprint' : 'race';
         $newTimeMs     = $result->fastest_lap_time_ms;

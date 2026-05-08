@@ -88,7 +88,7 @@ class DriverCareerService
             ->leftJoin('series as ser', 's.series_id', '=', 'ser.id')
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('ecd.driver_id', $driverId)
-            ->where('ser.world_id', $worldId)
+            ->where('s.world_id', $worldId)
             ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.id as entrant_id', DB::raw('COALESCE(se.display_name, e.name) as entrant_name'), 'sc.name as class_name']);
 
         // Results drivers (for one-offs/mid-season)
@@ -102,7 +102,7 @@ class DriverCareerService
             ->leftJoin('series as ser', 's.series_id', '=', 'ser.id')
             ->leftJoin('entrants as e', 'se.entrant_id', '=', 'e.id')
             ->where('rd.driver_id', $driverId)
-            ->where('ser.world_id', $worldId)
+            ->where('s.world_id', $worldId)
             ->select(['s.id as season_id', 's.year as season_year', 'ser.name as series_name', 'e.id as entrant_id', DB::raw('COALESCE(se.display_name, e.name) as entrant_name'), 'sc.name as class_name']);
 
         return $assigned->union($results)->get();

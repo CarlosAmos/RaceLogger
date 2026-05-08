@@ -31,5 +31,9 @@ class Constructor extends Model
     {
         return $this->hasMany(Entrant::class);
     }
-    
+
+    public function manufacturedEngines()
+    {
+        return $this->hasMany(Engine::class);
+    }
 }

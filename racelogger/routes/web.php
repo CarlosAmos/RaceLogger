@@ -26,6 +26,7 @@ use App\Http\Controllers\EntryCarDriverController;
 use App\Http\Controllers\PointSystemController;
 use App\Http\Controllers\RaceWeekendController;
 use App\Http\Controllers\LapRecordController;
+use App\Http\Controllers\ImportController;
 
 
 Route::resource('worlds', WorldController::class);
@@ -125,3 +126,6 @@ Route::post(
     '/races/{race}/weekend',
     [RaceWeekendController::class, 'update']
 )->name('races.weekend.update');
+
+Route::get('/import', [ImportController::class, 'index'])->name('import.index');
+Route::post('/import/run', [ImportController::class, 'run'])->name('import.run');

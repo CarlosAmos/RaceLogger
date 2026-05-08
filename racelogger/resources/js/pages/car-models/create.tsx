@@ -13,6 +13,7 @@ interface Engine {
     name: string;
     capacity: string | null;
     configuration: string | null;
+    manufacturer: { name: string } | null;
 }
 
 interface Constructor {
@@ -96,9 +97,10 @@ export default function CarModelCreate({ world, constructor: ctor, engines }: Pr
                             <option value="">— No engine —</option>
                             {engines.map((e) => {
                                 const detail = [e.capacity, e.configuration].filter(Boolean).join(' ');
+                                const label = e.manufacturer ? `${e.manufacturer.name} | ${e.name}` : e.name;
                                 return (
                                     <option key={e.id} value={e.id}>
-                                        {e.name}{detail ? ` — ${detail}` : ''}
+                                        {label}{detail ? ` — ${detail}` : ''}
                                     </option>
                                 );
                             })}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\World;
+use App\Models\Constructor;
 use Inertia\Inertia;
 
 class WorldEngineController extends Controller
@@ -14,6 +15,7 @@ class WorldEngineController extends Controller
     public function index(World $world)
     {
         $engines = $world->engines()
+            ->with('manufacturer')
             ->orderBy('name')
             ->get();
 
@@ -25,7 +27,9 @@ class WorldEngineController extends Controller
      */
     public function create(World $world)
     {
-        return Inertia::render('engines/create', compact('world'));
+        $constructors = Constructor::where('world_id', $world->id)->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('engines/create', compact('world', 'constructors'));
     }
 
     /**
@@ -34,14 +38,15 @@ class WorldEngineController extends Controller
     public function store(Request $request, World $world)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'configuration' => 'nullable|string|max:50',
-            'capacity' => 'nullable|string|max:50',
+            'name'           => 'required|string|max:255',
+            'constructor_id' => 'nullable|integer|exists:constructors,id',
+            'configuration'  => 'nullable|string|max:50',
+            'capacity'       => 'nullable|string|max:50',
         ]);
 
         $world->engines()->create([
             ...$validated,
-            'hybrid' => $request->has('hybrid'),
+            'hybrid' => $request->boolean('hybrid'),
         ]);
 
         return redirect()

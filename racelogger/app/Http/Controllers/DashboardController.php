@@ -27,9 +27,7 @@ class DashboardController extends Controller
         $currentYear = $world->current_year ?? Carbon::now()->year;
 
         // Get seasons for current year with their series
-        $seasons = Season::whereHas('series', function ($query) use ($worldId) {
-                $query->where('world_id', $worldId);
-            })
+        $seasons = Season::where('world_id', $worldId)
             ->with('series')
             ->orderBy('year', 'asc')
             ->get();
@@ -39,28 +37,18 @@ class DashboardController extends Controller
             ->whereHas('season', function ($query) use ($currentYear) {
                 $query->where('year', '>=', $currentYear);
             })
-            ->whereHas('season.series', function ($query) use ($worldId) {
+            ->whereHas('season', function ($query) use ($worldId) {
                 $query->where('world_id', $worldId);
             })
             ->orderBy('race_date', 'asc')
             ->get();
 
-        if($worldId == 2) {
-            $myId = 194; // My Id
-        } else if($worldId == 3) {
-            $myId = 1569;
-        } else if($worldId == 5) {
-            $myId = 2672;
-        } else {
-            $myId = 2671;
-        }
-        
-        
-        // $myId = 186;
-        // $myId = 161;
-        //$results = $this->getDriverSeasonResults($myId, $worldId);
-        $careerMap   = $service->getCareerStructure($myId, $worldId);
-        $resultsGrid = $gridService->getResultsGrid($myId, $worldId);
+        $myId     = 97;
+        $driverId = (int) request()->query('driver_id', $myId);
+        $driver   = Driver::findOrFail($driverId);
+
+        $careerMap   = $service->getCareerStructure($driverId, $worldId);
+        $resultsGrid = $gridService->getResultsGrid($driverId, $worldId);
 
         return Inertia::render('dashboard', compact(
             'world',
@@ -68,7 +56,9 @@ class DashboardController extends Controller
             'seasons',
             'upcomingRaces',
             'careerMap',
-            'resultsGrid'
+            'resultsGrid',
+            'driver',
+            'myId'
         ));
     }
 
@@ -79,7 +69,7 @@ class DashboardController extends Controller
     private function resolveAccImport(int $worldId): array
     {
         $race = CalendarRace::where('is_locked', 0)
-            ->whereHas('season.series', fn($q) => $q->where('world_id', $worldId)->where('game', 'acc'))
+            ->whereHas('season', fn($q) => $q->where('world_id', $worldId)->whereHas('series', fn($q2) => $q2->where('game', 'acc')))
             ->with('season.series')
             ->orderBy('id', 'asc')
             ->first();
@@ -128,7 +118,7 @@ class DashboardController extends Controller
             $drivers = [];
             foreach ($car['drivers'] as $d) {
                 Driver::firstOrCreate(
-                    ['world_id' => $worldId, 'first_name' => $d['firstName'], 'last_name' => $d['lastName']],
+                    ['first_name' => $d['firstName'], 'last_name' => $d['lastName']],
                     ['country_id' => null]
                 );
                 $drivers[] = ['first_name' => $d['firstName'], 'last_name' => $d['lastName']];

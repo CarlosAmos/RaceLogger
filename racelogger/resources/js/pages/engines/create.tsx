@@ -13,11 +13,17 @@ interface World {
     name: string;
 }
 
-interface Props {
-    world: World;
+interface Constructor {
+    id: number;
+    name: string;
 }
 
-export default function EngineCreate({ world }: Props) {
+interface Props {
+    world: World;
+    constructors: Constructor[];
+}
+
+export default function EngineCreate({ world, constructors }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: world.name, href: '#' },
         { title: 'Engines', href: worldsEngines.index(world.id).url },
@@ -26,6 +32,7 @@ export default function EngineCreate({ world }: Props) {
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
+        constructor_id: '' as string | number,
         configuration: '',
         capacity: '',
         hybrid: false,
@@ -53,6 +60,24 @@ export default function EngineCreate({ world }: Props) {
                             required
                         />
                         <InputError message={errors.name} />
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label htmlFor="constructor_id">Manufacturer</Label>
+                        <select
+                            id="constructor_id"
+                            value={data.constructor_id}
+                            onChange={(e) => setData('constructor_id', e.target.value ? Number(e.target.value) : '')}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                            <option value="">— None —</option>
+                            {constructors.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.constructor_id} />
                     </div>
 
                     <div className="space-y-1">

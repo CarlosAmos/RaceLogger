@@ -10,11 +10,7 @@ class SeriesController extends Controller
 {
     public function index()
     {
-        $worldId = session('active_world_id');
-
-        $series = Series::where('world_id', $worldId)
-            ->orderBy('created_at')
-            ->get();
+        $series = Series::orderBy('name')->get();
 
         return Inertia::render('series/index', ['series' => $series]);
     }
@@ -35,10 +31,7 @@ class SeriesController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        $worldId = session('active_world_id');
-
         $series = Series::create([
-            'world_id' => $worldId,
             'name' => $validated['name'],
             'is_multiclass' => $request->has('is_multiclass'),
         ]);

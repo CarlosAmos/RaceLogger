@@ -7,12 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import type { BreadcrumbItem } from '@/types';
 import worldsEngines from '@/routes/worlds/engines';
 
+interface Constructor {
+    id: number;
+    name: string;
+}
+
 interface Engine {
     id: number;
     name: string;
     configuration: string | null;
     capacity: string | null;
     hybrid: boolean;
+    manufacturer: Constructor | null;
 }
 
 interface World {
@@ -58,6 +64,7 @@ export default function EnginesIndex({ world, engines }: Props) {
                             <thead>
                                 <tr className="border-b border-sidebar-border">
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
+                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Manufacturer</th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Configuration</th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Capacity</th>
                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
@@ -67,6 +74,7 @@ export default function EnginesIndex({ world, engines }: Props) {
                                 {engines.map((e) => (
                                     <tr key={e.id} className="border-b border-sidebar-border last:border-0">
                                         <td className="px-4 py-3 font-medium">{e.name}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">{e.manufacturer?.name ?? '—'}</td>
                                         <td className="px-4 py-3 text-muted-foreground">{e.configuration ?? '—'}</td>
                                         <td className="px-4 py-3 text-muted-foreground">{e.capacity ?? '—'}</td>
                                         <td className="px-4 py-3">

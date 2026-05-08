@@ -6,6 +6,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            activeWorld: { id: number; name: string; current_year: number } | null;
             [key: string]: unknown;
         };
     }

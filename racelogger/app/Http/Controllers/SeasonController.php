@@ -25,7 +25,7 @@ class SeasonController extends Controller
         $world   = World::findOrFail($worldId);
 
         $seasons = Season::with(['series', 'calendarRaces', 'seasonClasses'])
-            ->whereHas('series', fn ($q) => $q->where('world_id', $worldId))
+            ->where('world_id', $worldId)
             ->orderByDesc('year')
             ->get()
             ->groupBy('series_id')
@@ -55,7 +55,7 @@ class SeasonController extends Controller
         $world = World::findOrFail($worldId);
 
         $seriesId = $request->query('series_id');
-        $series = Series::where('world_id', $worldId)->get();
+        $series = Series::orderBy('name')->get();
 
         $defaultYear = $world->current_year;
         $seasonYear = $defaultYear;
@@ -125,8 +125,9 @@ class SeasonController extends Controller
 
             // Create Season (WITH default point system)
             $season = Season::create([
-                'series_id' => $request->series_id,
-                'year' => $request->year,
+                'series_id'       => $request->series_id,
+                'world_id'        => session('active_world_id'),
+                'year'            => $request->year,
                 'point_system_id' => $request->point_system_id ?: null,
             ]);
 
@@ -264,9 +265,9 @@ class SeasonController extends Controller
 
         $tab = request('tab', 'teams');
 
-        abort_unless($season->series->world_id == $worldId, 403);
+        abort_unless($season->world_id == $worldId, 403);
 
-        $series = Series::where('world_id', $worldId)->get();
+        $series = Series::orderBy('name')->get();
 
         $seasonYear = $season->year;
 
@@ -294,8 +295,7 @@ class SeasonController extends Controller
             'calendarRaces.layout.track.country'
         ]);
 
-        $drivers = Driver::where('world_id', $worldId)
-            ->orderBy('last_name')
+        $drivers = Driver::orderBy('last_name')
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -412,6 +412,15 @@ class SeasonController extends Controller
             $submittedIds      = [];
             $unlockedCalRaces  = []; // track unlocked races for folder creation
 
+            // Shift existing round numbers to a temp range so reordering/inserting
+            // doesn't violate the unique (season_id, round_number) constraint mid-loop
+            $existingSubmittedIds = array_filter(array_column($request->circuits, 'id'));
+            if (!empty($existingSubmittedIds)) {
+                $season->calendarRaces()
+                    ->whereIn('id', $existingSubmittedIds)
+                    ->update(['round_number' => DB::raw('round_number + 10000')]);
+            }
+
             foreach ($request->circuits as $index => $race) {
                 $attrs = [
                     'season_id'        => $season->id,
@@ -432,10 +441,12 @@ class SeasonController extends Controller
                     $calRace = CalendarRace::find($race['id']);
                     if ($calRace && $calRace->season_id === $season->id) {
                         $submittedIds[] = $calRace->id;
-                        // Skip finished races — preserve their data unchanged
                         if (!$calRace->is_locked && !$calRace->results()->exists()) {
                             $calRace->update($attrs);
                             $unlockedCalRaces[] = $calRace;
+                        } else {
+                            // Preserve race data but always restore the correct round_number
+                            $calRace->update(['round_number' => $index + 1]);
                         }
                         continue;
                     }
@@ -484,7 +495,7 @@ class SeasonController extends Controller
      */
     private function resolveAccImport(Season $season): array
     {
-        $worldId = $season->series->world_id;
+        $worldId = $season->world_id;
 
         $race = CalendarRace::where('season_id', $season->id)
             ->where('is_locked', 0)
@@ -538,24 +549,9 @@ class SeasonController extends Controller
             // Auto-insert drivers, copying country_id from another world if available
             $drivers = [];
             foreach ($car['drivers'] as $d) {
-                $exists = Driver::where('world_id', $worldId)
-                    ->where('first_name', $d['firstName'])
-                    ->where('last_name', $d['lastName'])
-                    ->exists();
-
-                if (!$exists) {
-                    $template = Driver::where('first_name', $d['firstName'])
-                        ->where('last_name', $d['lastName'])
-                        ->whereNotNull('country_id')
-                        ->first();
-
-                    Driver::create([
-                        'world_id'   => $worldId,
-                        'first_name' => $d['firstName'],
-                        'last_name'  => $d['lastName'],
-                        'country_id' => $template?->country_id,
-                    ]);
-                }
+                Driver::firstOrCreate(
+                    ['first_name' => $d['firstName'], 'last_name' => $d['lastName']]
+                );
 
                 $drivers[] = ['first_name' => $d['firstName'], 'last_name' => $d['lastName']];
             }
@@ -683,7 +679,7 @@ class SeasonController extends Controller
             'drivers.*.last_name'  => 'required|string',
         ]);
 
-        $worldId     = $season->series->world_id;
+        $worldId     = $season->world_id;
         $seasonEntry = \App\Models\SeasonEntry::findOrFail($request->season_entry_id);
 
         $entryClass = $seasonEntry->entryClasses()->firstOrCreate([
@@ -700,8 +696,7 @@ class SeasonController extends Controller
         $season->load(['replaceDriver', 'substituteDriver']);
 
         foreach ($request->drivers ?? [] as $d) {
-            $driver = Driver::where('world_id', $worldId)
-                ->where('first_name', $d['first_name'])
+            $driver = Driver::where('first_name', $d['first_name'])
                 ->where('last_name', $d['last_name'])
                 ->first();
 
@@ -732,7 +727,7 @@ class SeasonController extends Controller
      */
     public function accAssignDrivers(Season $season)
     {
-        $worldId = $season->series->world_id;
+        $worldId = $season->world_id;
 
         $race = CalendarRace::where('season_id', $season->id)
             ->where('is_locked', 0)
@@ -858,8 +853,7 @@ class SeasonController extends Controller
 
             // Assign drivers with substitution rule applied
             foreach ($carData['drivers'] as $d) {
-                $driver = Driver::where('world_id', $worldId)
-                    ->where('first_name', $d['firstName'])
+                $driver = Driver::where('first_name', $d['firstName'])
                     ->where('last_name', $d['lastName'])
                     ->first();
 

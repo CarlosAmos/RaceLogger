@@ -27,11 +27,6 @@ class World extends Model
         return $this->hasMany(Team::class);
     }
 
-    public function drivers()
-    {
-        return $this->hasMany(Driver::class);
-    }
-
     public function lapRecords()
     {
         return $this->hasMany(LapRecord::class);

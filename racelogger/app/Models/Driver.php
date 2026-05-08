@@ -7,17 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Driver extends Model
 {
     protected $fillable = [
-        'world_id',
         'first_name',
         'last_name',
         'country_id',
         'date_of_birth',
     ];
-
-    public function world()
-    {
-        return $this->belongsTo(World::class);
-    }
 
     public function country()
     {

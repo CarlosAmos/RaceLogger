@@ -9,6 +9,7 @@ use App\Models\EntryClass;
 use App\Models\EntryCar;
 use App\Models\Driver;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class EntryCarDriverController extends Controller
@@ -21,8 +22,7 @@ class EntryCarDriverController extends Controller
         EntryClass $entryClass,
         EntryCar $entryCar
     ) {
-        $drivers = $world->drivers()
-            ->with('country')
+        $drivers = Driver::with('country')
             ->orderBy('first_name')
             ->get();
 
@@ -75,9 +75,30 @@ class EntryCarDriverController extends Controller
         EntryCar $entryCar
     ) {
         $validated = $request->validate([
-            'drivers' => 'nullable|array',
-            'drivers.*' => 'exists:drivers,id',
+            'drivers'      => 'nullable|array',
+            'drivers.*'    => 'exists:drivers,id',
+            'reassign_ids' => 'nullable|array',
+            'reassign_ids.*' => 'exists:drivers,id',
         ]);
+
+        // Detach reassigned drivers from every other entry car in this season
+        if (!empty($validated['reassign_ids'])) {
+            $otherCarIds = $season->seasonEntries()
+                ->with('entryClasses.entryCars')
+                ->get()
+                ->pluck('entryClasses')->flatten()
+                ->pluck('entryCars')->flatten()
+                ->where('id', '!=', $entryCar->id)
+                ->pluck('id')
+                ->values();
+
+            if ($otherCarIds->isNotEmpty()) {
+                DB::table('entry_car_driver')
+                    ->whereIn('entry_car_id', $otherCarIds)
+                    ->whereIn('driver_id', $validated['reassign_ids'])
+                    ->delete();
+            }
+        }
 
         $entryCar->drivers()->sync($validated['drivers'] ?? []);
 

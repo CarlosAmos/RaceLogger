@@ -46,7 +46,7 @@ class CareerResultsGridService
             ->leftJoin('engines as eng',        'cm.engine_id',          '=', 'eng.id')
             ->leftJoin('season_classes as sc',  'ecl.race_class_id',     '=', 'sc.id')
             ->where('rd.driver_id', $driverId)
-            ->where('ser.world_id', $worldId)
+            ->where('s.world_id', $worldId)
             ->where('rs.is_sprint', false)
             ->select([
                 's.id as season_id',

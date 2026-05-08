@@ -46,6 +46,11 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
 'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'activeWorld' => $activeWorld,
+            'flash' => [
+                'import_success' => session('import_success'),
+                'import_output'  => session('import_output'),
+                'import_step'    => session('import_step'),
+            ],
         ];
     }
 }

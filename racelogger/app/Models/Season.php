@@ -8,6 +8,7 @@ class Season extends Model
 {
     protected $fillable = [
         'series_id',
+        'world_id',
         'year',
         'point_system_id',
         'replace_driver_id',

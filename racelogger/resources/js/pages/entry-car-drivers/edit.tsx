@@ -1,12 +1,8 @@
 import { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 import entryCarDriversRoutes from '@/routes/entry-cars/drivers';
 
@@ -83,21 +79,34 @@ export default function EntryCarDriversEdit({
     ];
 
     const [search, setSearch] = useState('');
-
-    const { data, setData, post, processing, errors } = useForm({
-        drivers: assignedDrivers,
-    });
+    const [selectedDrivers, setSelectedDrivers] = useState<number[]>(assignedDrivers);
+    const [reassignIds, setReassignIds] = useState<number[]>([]);
+    const [processing, setProcessing] = useState(false);
 
     function toggleDriver(driverId: number) {
-        setData('drivers', data.drivers.includes(driverId)
-            ? data.drivers.filter((id) => id !== driverId)
-            : [...data.drivers, driverId]
+        setSelectedDrivers((prev) =>
+            prev.includes(driverId) ? prev.filter((id) => id !== driverId) : [...prev, driverId]
+        );
+    }
+
+    function toggleReassign(driverId: number) {
+        const isQueued = reassignIds.includes(driverId);
+        setReassignIds((prev) =>
+            isQueued ? prev.filter((id) => id !== driverId) : [...prev, driverId]
+        );
+        setSelectedDrivers((prev) =>
+            isQueued ? prev.filter((id) => id !== driverId) : [...prev, driverId]
         );
     }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        post(entryCarDriversRoutes.update(routeArgs).url);
+        setProcessing(true);
+        router.post(
+            entryCarDriversRoutes.update(routeArgs).url,
+            { drivers: selectedDrivers, reassign_ids: reassignIds },
+            { onFinish: () => setProcessing(false) }
+        );
     }
 
     const matchesSearch = (d: Driver) => {
@@ -108,32 +117,46 @@ export default function EntryCarDriversEdit({
     const availableDrivers = drivers.filter((d) => !otherCarDriverIds.includes(d.id) && matchesSearch(d));
     const unavailableDrivers = drivers.filter((d) => otherCarDriverIds.includes(d.id) && matchesSearch(d));
 
-    const driverCard = (driver: Driver, disabled: boolean) => {
-        const isAssigned = data.drivers.includes(driver.id);
+    const driverCard = (driver: Driver, unavailable: boolean) => {
+        const isSelected = selectedDrivers.includes(driver.id);
+        const isQueued = reassignIds.includes(driver.id);
+
+        let cardClass = isSelected
+            ? 'border-green-500 bg-green-500/10 cursor-pointer'
+            : 'border-border hover:border-primary cursor-pointer';
+
+        if (unavailable) {
+            cardClass = isQueued
+                ? 'border-amber-500 bg-amber-500/10 cursor-pointer'
+                : 'border-border bg-muted opacity-60 cursor-pointer hover:opacity-100 hover:border-amber-400';
+        }
+
         return (
-            <label
+            <div
                 key={driver.id}
-                className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 transition-colors ${
-                    disabled
-                        ? 'border-border bg-muted opacity-50 cursor-not-allowed'
-                        : isAssigned
-                        ? 'border-green-500 bg-green-500/10'
-                        : 'border-border hover:border-primary'
-                }`}
+                role="button"
+                tabIndex={0}
+                onClick={() => unavailable ? toggleReassign(driver.id) : toggleDriver(driver.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { unavailable ? toggleReassign(driver.id) : toggleDriver(driver.id); } }}
+                className={`flex flex-col gap-0.5 rounded-lg border p-3 transition-colors select-none ${cardClass}`}
             >
                 <div className="flex items-center gap-2">
-                    <Checkbox
-                        id={`driver-${driver.id}`}
-                        checked={isAssigned}
-                        disabled={disabled}
-                        onCheckedChange={() => !disabled && toggleDriver(driver.id)}
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        readOnly
+                        tabIndex={-1}
+                        className="pointer-events-none h-4 w-4 rounded border-gray-300 accent-primary"
                     />
                     <span className="font-semibold text-sm">{driver.first_name} {driver.last_name}</span>
+                    {isQueued && (
+                        <span className="ml-auto text-xs font-medium text-amber-600 dark:text-amber-400">Reassign</span>
+                    )}
                 </div>
                 {driver.country && (
                     <span className="pl-6 text-xs text-muted-foreground">{driver.country.name}</span>
                 )}
-            </label>
+            </div>
         );
     };
 
@@ -160,8 +183,6 @@ export default function EntryCarDriversEdit({
                         {processing ? 'Saving…' : 'Save Drivers'}
                     </Button>
 
-                    {errors.drivers && <p className="text-sm text-destructive">{errors.drivers}</p>}
-
                     <div className="flex flex-col gap-3">
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Available Drivers</h3>
                         {availableDrivers.length === 0 ? (
@@ -175,7 +196,10 @@ export default function EntryCarDriversEdit({
 
                     {unavailableDrivers.length > 0 && (
                         <div className="flex flex-col gap-3">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Unavailable Drivers</h3>
+                            <div>
+                                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Assigned Elsewhere</h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">Click a driver to reassign them to this car.</p>
+                            </div>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                                 {unavailableDrivers.map((d) => driverCard(d, true))}
                             </div>

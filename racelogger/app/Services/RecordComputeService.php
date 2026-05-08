@@ -56,13 +56,12 @@ class RecordComputeService
             ->join('race_sessions as rs',   'r.race_session_id',    '=', 'rs.id')
             ->join('calendar_races as cr',  'rs.calendar_race_id',  '=', 'cr.id')
             ->join('seasons as s',          'cr.season_id',         '=', 's.id')
-            ->join('series as ser',         's.series_id',          '=', 'ser.id')
             ->join('drivers as d',          'rd.driver_id',         '=', 'd.id')
             ->join('entry_cars as ec',      'r.entry_car_id',       '=', 'ec.id')
             ->join('entry_classes as ecl',  'ec.entry_class_id',    '=', 'ecl.id')
             ->join('season_entries as se',  'ecl.season_entry_id',  '=', 'se.id')
             ->join('constructors as con',   'se.constructor_id',    '=', 'con.id')
-            ->where('ser.world_id', $worldId)
+            ->where('s.world_id', $worldId)
             ->where('rs.is_sprint', 0)
             ->select([
                 'rd.driver_id',
@@ -85,10 +84,9 @@ class RecordComputeService
             ->join('qualifying_sessions as qs', 'qr.qualifying_session_id', '=', 'qs.id')
             ->join('calendar_races as cr',       'qs.calendar_race_id',       '=', 'cr.id')
             ->join('seasons as s',               'cr.season_id',              '=', 's.id')
-            ->join('series as ser',              's.series_id',               '=', 'ser.id')
             ->join('entry_car_driver as ecd',    'qr.entry_car_id',           '=', 'ecd.entry_car_id')
             ->join('drivers as d',               'ecd.driver_id',             '=', 'd.id')
-            ->where('ser.world_id', $worldId)
+            ->where('s.world_id', $worldId)
             ->select([
                 'ecd.driver_id',
                 'd.first_name', 'd.last_name', 'd.date_of_birth',
@@ -213,8 +211,7 @@ class RecordComputeService
                 JOIN race_sessions rs  ON r.race_session_id = rs.id
                 JOIN calendar_races cr ON rs.calendar_race_id = cr.id
                 JOIN seasons s         ON cr.season_id = s.id
-                JOIN series ser        ON s.series_id = ser.id
-                WHERE ser.world_id = ?
+                WHERE s.world_id = ?
                   AND rs.name LIKE '%Race%'
                 GROUP BY rd.driver_id, cr.season_id, s.year
             ) sub

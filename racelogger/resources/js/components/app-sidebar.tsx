@@ -1,5 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { CalendarDays, Car, Flag, LayoutGrid, List, MapPin, Trophy, Globe } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { CalendarDays, Car, Download, Flag, LayoutGrid, List, MapPin, Trophy, Globe } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import {
@@ -22,6 +22,8 @@ import records from '@/routes/records';
 import teams from '@/routes/teams';
 
 export function AppSidebar() {
+    const activeWorldId = usePage().props.activeWorld?.id ?? null;
+
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
@@ -58,6 +60,9 @@ export function AppSidebar() {
             href: records.index().url,
             icon: Trophy,
         },
+        ...(activeWorldId === 1
+            ? [{ title: 'Import', href: '/import', icon: Download } as NavItem]
+            : []),
     ];
 
     const footerNavItems: NavItem[] = [

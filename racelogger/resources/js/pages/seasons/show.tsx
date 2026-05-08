@@ -323,7 +323,9 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
     const [champSubTab, setChampSubTab] = useState<'overall' | 'sprint' | 'endurance'>('overall');
 
     useEffect(() => {
+        console.log('[SeasonShow] Mount — accImport:', accImport, 'accModalOpen:', accModalOpen);
         if (accImport && !accModalOpen) {
+            console.log('[SeasonShow] Triggering auto-assign for season', season.id);
             router.post(`/seasons/${season.id}/acc/assign-drivers`, {}, {
                 preserveScroll: true,
                 preserveState: true,
@@ -646,7 +648,9 @@ export default function SeasonShow({ season, series, world, tab: initialTab, cla
                                     <tr key={row.driverId}>
                                         <td className="border border-border px-2 py-1">{displayPos}</td>
                                         <td className="border border-border px-2 py-1 text-left whitespace-nowrap">
-                                            {row.driver.first_name} {row.driver.last_name}
+                                            <Link href={`/dashboard?driver_id=${row.driverId}`} className="hover:underline text-blue-600">
+                                                {row.driver.first_name} {row.driver.last_name}
+                                            </Link>
                                         </td>
                                         <td className="border border-border px-2 py-1">#{row.carNumber}</td>
                                         <td className="border border-border px-2 py-1 text-left text-muted-foreground whitespace-nowrap">

@@ -30,6 +30,7 @@ class ConstructorCarModelController extends Controller
     public function create(World $world, Constructor $constructor)
     {
         $engines = $world->engines()
+            ->with('manufacturer')
             ->orderBy('name')
             ->get();
 

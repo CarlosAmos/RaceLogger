@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class Series extends Model
 {
     protected $fillable = [
-        'world_id',
         'name',
         'is_multiclass',
         'game',
@@ -16,11 +15,6 @@ class Series extends Model
     protected $casts = [
         'is_multiclass' => 'boolean',
     ];
-
-    public function world()
-    {
-        return $this->belongsTo(World::class);
-    }
 
     public function seasons()
     {
