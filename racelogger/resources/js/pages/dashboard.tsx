@@ -243,10 +243,10 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                             </div>
 
                             {/* Career Map Table */}
-                            <div>
+                            <div className="flex flex-col items-start">
                                 <h5 className="mb-2 font-medium">Racing Career</h5>
                                 <div className="overflow-x-auto rounded-lg border">
-                                    <table className="w-full border-collapse text-sm">
+                                    <table className="border-collapse text-sm">
                                         <thead>
                                             <tr className="border-b bg-muted/50">
                                                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Season</th>
@@ -356,10 +356,10 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                     });
 
                                     return (
-                                        <div key={seriesName}>
+                                        <div key={seriesName} className="flex flex-col items-start">
                                             <h5 className="mb-2 font-medium">{seriesName}</h5>
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full border-collapse text-xs">
+                                            <div className="overflow-x-auto rounded-lg border flex flex-col items-start">
+                                                <table className="border-collapse text-xs">
                                                     <thead>
                                                         <tr className="border-b bg-muted/50">
                                                             <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Year</th>
@@ -457,10 +457,10 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                         ev.entries.some(e => e.subclass_results != null)
                                                     );
                                                     return (
-                                                        <div key={gpName} className="mt-3">
+                                                        <div key={gpName} className="mt-3 flex flex-col items-start">
                                                             <h6 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{gpName}</h6>
-                                                            <div className="overflow-x-auto rounded-lg border">
-                                                                <table className="w-full border-collapse text-xs">
+                                                            <div className="overflow-x-auto rounded-lg border flex flex-col items-start">
+                                                                <table className="border-collapse text-xs">
                                                                     <thead>
                                                                         <tr className="border-b bg-muted/50">
                                                                             <th className="px-3 py-2 text-center font-semibold text-muted-foreground">Year</th>
@@ -514,9 +514,9 @@ export default function Dashboard({ world, currentYear, seasons: seasonsList, up
                                                     sd.calendar.filter(rd => !rd.special_event).reduce((acc, rd) => acc + Math.max(1, rd.sessions.length), 0)
                                                 ));
                                                 return (
-                                                    <div key={subCup.label} className="mt-4">
+                                                    <div key={subCup.label} className="mt-4 flex flex-col items-start">
                                                         <h6 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{subCup.label}</h6>
-                                                        <div className="overflow-x-auto rounded-lg border">
+                                                        <div className="overflow-x-auto rounded-lg border flex flex-col items-start">
                                                             <table className="w-full border-collapse text-xs">
                                                                 <thead>
                                                                     <tr className="border-b bg-muted/50">
