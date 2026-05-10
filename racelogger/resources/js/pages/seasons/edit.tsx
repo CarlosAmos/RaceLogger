@@ -544,7 +544,7 @@ export default function SeasonEdit({
                                                         className="w-48 cursor-pointer rounded-lg border border-border bg-card p-2.5 text-left transition-colors hover:border-primary hover:bg-accent"
                                                     >
                                                         <strong className="block text-sm">{layout.track.name}</strong>
-                                                        <small className="text-xs text-muted-foreground">{layout.name}</small>
+                                                        <small className="text-xs text-muted-foreground">#{layout.id} - {layout.name}</small>
                                                     </button>
                                                 ))}
                                         </div>

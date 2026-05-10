@@ -142,6 +142,7 @@ const seriesColorClass: Record<string, string> = {
     SUP2:  'border-teal-600 bg-teal-600/30 text-white',
     MAU: 'border-white-800 bg-white-800/30 text-white',
     TOY: 'border-red-800 bg-red-800/30 text-white',
+    IMSA: 'border-teal-300 bg-teal-300/30 text-white',
 };
 
 function positionClass(pos: string | number | null): string {
